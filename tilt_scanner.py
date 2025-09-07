@@ -116,22 +116,35 @@ class TiltScanner:
             mac_addr = data.get("mac", mac)
             
             # Determine color from UUID
+            # Debug what we're getting
+            print(f"Debug: Raw UUID from plugin: '{uuid}'")
+            
+            # The UUID might have A495 duplicated, let's clean it up
+            clean_uuid = uuid.upper()
+            
+            # If UUID starts with A495A495, remove the duplicate
+            if clean_uuid.startswith("A495A495"):
+                clean_uuid = clean_uuid[4:]  # Remove first A495
+                print(f"Debug: Removed duplicate A495, now: '{clean_uuid}'")
+            
+            # Check against our known UUIDs
             color = "UNKNOWN"
-            full_uuid = f"A495{uuid.upper()}"
-            if full_uuid in TILT_UUIDS:
-                color = TILT_UUIDS[full_uuid]
+            if clean_uuid in TILT_UUIDS:
+                color = TILT_UUIDS[clean_uuid]
+                print(f"Debug: Matched! Color is {color}")
             
             if color == "UNKNOWN":
-                print(f"Unknown Tilt UUID: {full_uuid}")
+                print(f"Debug: No match found for UUID: {clean_uuid}")
+                print(f"Debug: Available UUIDs: {list(TILT_UUIDS.keys())}")
                 return
                 
-            # Use UUID as device key
-            device_key = full_uuid
+            # Use clean UUID as device key
+            device_key = clean_uuid
             
             # Get or create device
             if device_key not in self.devices:
                 self.devices[device_key] = TiltDevice(color, device_key)
-                print(f"[DISCOVERED] {color} Tilt detected (UUID: {full_uuid}, MAC: {mac_addr})")
+                print(f"[DISCOVERED] {color} Tilt detected (UUID: {clean_uuid}, MAC: {mac_addr})")
             
             # Update device reading
             self.devices[device_key].update_reading(temp_f, gravity, rssi_val)
