@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 import aioblescan as aiobs
+from aioblescan.plugins import Tilt
 
 # Tilt Hydrometer UUID mappings for each color
 TILT_UUIDS = {
@@ -68,85 +69,129 @@ class TiltDevice:
 class TiltScanner:
     """Main scanner class for detecting and reading Tilt hydrometers"""
     
-    def __init__(self):
+    def __init__(self, device_id=0):
         self.devices: Dict[str, TiltDevice] = {}
         self.running = False
+        self.device_id = device_id
+        self.tilt_decoder = Tilt()
         
-    def parse_ibeacon_data(self, data: bytes) -> Optional[Tuple[str, float, float, int]]:
-        """Parse iBeacon advertisement data for Tilt information"""
-        if len(data) < 25:
-            return None
+    def process_data(self, data):
+        """Process BLE advertisement data using aioblescan format"""
+        # Decode HCI event
+        ev = aiobs.HCI_Event()
+        try:
+            ev.decode(data)
+        except:
+            return
             
-        # Check for iBeacon format (Apple manufacturer data)
-        if data[0] != 0x4C or data[1] != 0x00 or data[2] != 0x02 or data[3] != 0x15:
-            return None
+        # Try to decode with Tilt plugin
+        result = self.tilt_decoder.decode(ev)
+        if result:
+            # Parse the result to extract information
+            result_str = str(result)
             
-        # Extract UUID (16 bytes starting at offset 4)
-        uuid_bytes = data[4:20]
-        uuid = uuid_bytes.hex().upper()
-        
-        # Check if this is a Tilt UUID
-        if uuid not in TILT_UUIDS:
-            return None
+            # Extract MAC address for device identification
+            mac_addresses = ev.retrieve("peer")
+            mac = mac_addresses[0].val if mac_addresses else "unknown"
             
-        # Extract major (temperature) and minor (gravity) values
-        major = struct.unpack('>H', data[20:22])[0]  # Temperature in °F
-        minor = struct.unpack('>H', data[22:24])[0]  # Gravity * 1000
-        
-        temperature_f = float(major)
-        specific_gravity = float(minor) / 1000.0
-        
-        return uuid, temperature_f, specific_gravity, 0  # RSSI will be set separately
-        
-    def process_advertisement(self, data):
-        """Process BLE advertisement data"""
-        if hasattr(data, 'raw_data'):
-            # Look for manufacturer specific data
-            for ad_structure in data.raw_data:
-                if hasattr(ad_structure, 'payload') and len(ad_structure.payload) >= 25:
-                    result = self.parse_ibeacon_data(ad_structure.payload)
-                    if result:
-                        uuid, temp_f, gravity, _ = result
-                        color = TILT_UUIDS[uuid]
-                        
-                        # Get or create device
-                        if uuid not in self.devices:
-                            self.devices[uuid] = TiltDevice(color, uuid)
-                            print(f"[DISCOVERED] {color} Tilt detected (UUID: {uuid})")
-                        
-                        # Update device reading
-                        rssi = getattr(data, 'rssi', 0)
-                        self.devices[uuid].update_reading(temp_f, gravity, rssi)
-                        
-                        # Print reading
-                        device = self.devices[uuid]
-                        print(f"[{color}] Raw: {temp_f:.1f}°F, {gravity:.3f} SG | "
-                              f"Calibrated: {device.get_calibrated_temperature_f():.1f}°F "
-                              f"({device.get_calibrated_temperature_c():.1f}°C), "
-                              f"{device.get_calibrated_gravity():.3f} SG | "
-                              f"RSSI: {rssi} dBm")
+            # Extract RSSI
+            rssi_data = ev.retrieve("rssi")
+            rssi = rssi_data[0].val if rssi_data else 0
+            
+            # Parse the Tilt result string to extract color, temp, and gravity
+            # Expected format contains color, temperature, and gravity information
+            self.parse_tilt_result(result_str, mac, rssi)
+    
+    def parse_tilt_result(self, result_str: str, mac: str, rssi: int):
+        """Parse Tilt plugin JSON result"""
+        try:
+            # The Tilt plugin returns JSON data
+            data = json.loads(result_str)
+            
+            # Extract values from JSON
+            uuid = data.get("uuid", "")
+            temp_f = float(data.get("major", 0))  # Temperature in °F
+            gravity = float(data.get("minor", 0)) / 1000.0  # Gravity (divided by 1000)
+            rssi_val = data.get("rssi", rssi)
+            mac_addr = data.get("mac", mac)
+            
+            # Determine color from UUID
+            color = "UNKNOWN"
+            full_uuid = f"A495{uuid.upper()}"
+            if full_uuid in TILT_UUIDS:
+                color = TILT_UUIDS[full_uuid]
+            
+            if color == "UNKNOWN":
+                print(f"Unknown Tilt UUID: {full_uuid}")
+                return
+                
+            # Use UUID as device key
+            device_key = full_uuid
+            
+            # Get or create device
+            if device_key not in self.devices:
+                self.devices[device_key] = TiltDevice(color, device_key)
+                print(f"[DISCOVERED] {color} Tilt detected (UUID: {full_uuid}, MAC: {mac_addr})")
+            
+            # Update device reading
+            self.devices[device_key].update_reading(temp_f, gravity, rssi_val)
+            
+            # Print reading
+            device = self.devices[device_key]
+            print(f"[{color}] Raw: {temp_f:.1f}°F, {gravity:.3f} SG | "
+                  f"Calibrated: {device.get_calibrated_temperature_f():.1f}°F "
+                  f"({device.get_calibrated_temperature_c():.1f}°C), "
+                  f"{device.get_calibrated_gravity():.3f} SG | "
+                  f"RSSI: {rssi_val} dBm")
+                      
+        except json.JSONDecodeError as e:
+            print(f"Error parsing Tilt JSON: {e}")
+            print(f"Result string: {result_str}")
+        except Exception as e:
+            print(f"Error processing Tilt data: {e}")
+            print(f"Result string: {result_str}")
                         
     async def scan(self, duration: int = 30):
         """Scan for Tilt devices for specified duration"""
         print(f"Starting Tilt scan for {duration} seconds...")
         print("Looking for Tilt hydrometers...")
         
-        # Create BLE scanner
-        scanner = aiobs.BLEScanRequester()
-        scanner.set_callback(self.process_advertisement)
-        
-        # Start scanning
-        self.running = True
-        await scanner.start()
-        
         try:
+            event_loop = asyncio.get_running_loop()
+            
+            # Create Bluetooth socket
+            mysocket = aiobs.create_bt_socket(self.device_id)
+            
+            # Create connection
+            conn, btctrl = await event_loop._create_connection_transport(
+                mysocket, aiobs.BLEScanRequester, None, None
+            )
+            
+            # Attach our processing function
+            btctrl.process = self.process_data
+            
+            # Start scanning
+            await btctrl.send_scan_request()
+            print("Bluetooth LE scanning started...")
+            
+            self.running = True
+            
             # Scan for specified duration
             await asyncio.sleep(duration)
-        finally:
-            await scanner.stop()
-            self.running = False
             
-        print(f"\nScan completed. Found {len(self.devices)} Tilt device(s).")
+        except Exception as e:
+            print(f"Error during scanning: {e}")
+            return
+            
+        finally:
+            try:
+                # Stop scanning
+                await btctrl.stop_scan_request()
+                conn.close()
+                self.running = False
+                print(f"\nScan completed. Found {len(self.devices)} Tilt device(s).")
+            except:
+                pass
         
     def list_devices(self):
         """List all discovered devices"""
