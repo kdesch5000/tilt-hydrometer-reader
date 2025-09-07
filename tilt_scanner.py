@@ -156,22 +156,32 @@ class TiltScanner:
         print(f"Starting Tilt scan for {duration} seconds...")
         print("Looking for Tilt hydrometers...")
         
+        conn = None
+        btctrl = None
+        
         try:
             event_loop = asyncio.get_running_loop()
             
             # Create Bluetooth socket
             mysocket = aiobs.create_bt_socket(self.device_id)
             
-            # Create connection
-            conn, btctrl = await event_loop._create_connection_transport(
-                mysocket, aiobs.BLEScanRequester, None, None
-            )
+            # Create connection using the correct method
+            try:
+                # Try the new method first
+                conn, btctrl = await event_loop._create_connection_transport(
+                    mysocket, aiobs.BLEScanRequester, None, None
+                )
+            except AttributeError:
+                # Fallback to older method if _create_connection_transport doesn't exist
+                conn, btctrl = await event_loop.create_connection(
+                    aiobs.BLEScanRequester, sock=mysocket
+                )
             
             # Attach our processing function
             btctrl.process = self.process_data
             
             # Start scanning
-            await btctrl.send_scan_request()
+            btctrl.send_scan_request()  # Not a coroutine
             print("Bluetooth LE scanning started...")
             
             self.running = True
@@ -179,18 +189,26 @@ class TiltScanner:
             # Scan for specified duration
             await asyncio.sleep(duration)
             
+        except PermissionError as e:
+            print(f"Permission denied: {e}")
+            print("Make sure to run with sudo privileges")
+            return
         except Exception as e:
             print(f"Error during scanning: {e}")
+            print("Make sure Bluetooth is enabled and you have proper permissions")
             return
             
         finally:
             try:
-                # Stop scanning
-                await btctrl.stop_scan_request()
-                conn.close()
+                if btctrl:
+                    # Stop scanning
+                    btctrl.stop_scan_request()  # Not a coroutine
+                if conn:
+                    conn.close()
                 self.running = False
                 print(f"\nScan completed. Found {len(self.devices)} Tilt device(s).")
-            except:
+            except Exception as e:
+                print(f"Error during cleanup: {e}")
                 pass
         
     def list_devices(self):
