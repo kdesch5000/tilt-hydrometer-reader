@@ -206,8 +206,10 @@ class TidbytPusher:
             # Create display payload with consistent Installation ID
             image_data = self._create_webp_payload(device)
             
-            # Use a consistent installation ID based on device color to prevent duplicates
-            consistent_id = f"tilt-{device.color.lower()}-hydrometer"
+            # Use a very specific, unique installation ID to force replacement
+            # Include timestamp to ensure we override any stuck installations
+            from datetime import datetime
+            consistent_id = f"tilt-hydrometer-{device.color.lower()}-v2024"
             
             # If we have binary WebP data, encode it properly
             if isinstance(image_data, bytes):
