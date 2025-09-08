@@ -260,9 +260,10 @@ sudo python3 calibrate_tilt.py
 
 ### Interface Features
 
-- **Large ASCII Art Numbers**: 7-row high display for easy reading
+- **Large ASCII Art Numbers**: 7-row high display with perfect mathematical centering
+- **Symmetric Layout**: Identical 33-character wide boxes for gravity and temperature
 - **Real-time Updates**: 3-second refresh cycle
-- **History Charts**: 24-hour temperature and gravity trends
+- **Aligned History Charts**: Gravity and temperature charts positioned below their corresponding big numbers
 - **Signal Monitoring**: RSSI strength and last update timestamps  
 - **Built-in Calibration**: Interactive temperature and gravity calibration system
 - **Cloud Integration**: Automatic BrewStat.us uploads every 15 minutes

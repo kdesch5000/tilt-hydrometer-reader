@@ -684,62 +684,73 @@ class EasyHistoryMonitor:
                 gravity_lines = self.create_large_number(gravity, 3)
                 temp_lines = self.create_large_number(temp_f, 1)
                 
-                # Create boxes around gravity and temperature displays
-                lines.append("┌─────────────────────────────────┐  ┌─────────────────────────────────────────┐")
-                lines.append("│           GRAVITY               │  │            TEMPERATURE                  │")
-                lines.append("│                                 │  │                                         │")
+                # Define exact box widths - same for both
+                GRAVITY_BOX_WIDTH = 33  # Inner width for gravity box
+                TEMP_BOX_WIDTH = 33     # Inner width for temperature box (same as gravity)
                 
-                # Display ASCII art with perfect fixed-width alignment inside boxes (7 rows)
+                # Create box borders
+                lines.append("┌" + "─" * GRAVITY_BOX_WIDTH + "┐  ┌" + "─" * TEMP_BOX_WIDTH + "┐")
+                
+                # Header row with centered text
+                gravity_header = "GRAVITY"
+                temp_header = "TEMPERATURE"
+                
+                gravity_header_padding = (GRAVITY_BOX_WIDTH - len(gravity_header)) // 2
+                temp_header_padding = (TEMP_BOX_WIDTH - len(temp_header)) // 2
+                
+                gravity_header_line = " " * gravity_header_padding + gravity_header + " " * (GRAVITY_BOX_WIDTH - gravity_header_padding - len(gravity_header))
+                temp_header_line = " " * temp_header_padding + temp_header + " " * (TEMP_BOX_WIDTH - temp_header_padding - len(temp_header))
+                
+                lines.append("│" + gravity_header_line + "│  │" + temp_header_line + "│")
+                lines.append("│" + " " * GRAVITY_BOX_WIDTH + "│  │" + " " * TEMP_BOX_WIDTH + "│")
+                
+                # Display ASCII art (7 rows)
                 for i in range(7):
-                    # Get raw ASCII line without colors
-                    gravity_line = gravity_lines[i]
-                    temp_line = temp_lines[i]
+                    # Get the ASCII line without colors
+                    gravity_line = gravity_lines[i] if i < len(gravity_lines) else ""
+                    temp_line = temp_lines[i] if i < len(temp_lines) else ""
                     
-                    # Calculate actual display width (without ANSI color codes)
-                    gravity_line_width = len(self.strip_ansi(gravity_line))
-                    temp_line_width = len(self.strip_ansi(temp_line))
+                    # Calculate actual display width (no ANSI codes in these yet)
+                    gravity_line_width = len(gravity_line)
+                    temp_line_width = len(temp_line)
                     
-                    # Calculate padding to center within fixed box width
-                    gravity_left_pad = (31 - gravity_line_width) // 2
-                    gravity_right_pad = 31 - gravity_left_pad - gravity_line_width
+                    # Center the content in the box
+                    gravity_padding_left = (GRAVITY_BOX_WIDTH - gravity_line_width) // 2
+                    gravity_padding_right = GRAVITY_BOX_WIDTH - gravity_padding_left - gravity_line_width
                     
-                    temp_left_pad = (39 - temp_line_width) // 2  
-                    temp_right_pad = 39 - temp_left_pad - temp_line_width
+                    temp_padding_left = (TEMP_BOX_WIDTH - temp_line_width) // 2
+                    temp_padding_right = TEMP_BOX_WIDTH - temp_padding_left - temp_line_width
                     
-                    # Build content with exact fixed width (no colors in padding calculation)
-                    gravity_padded = f"{' ' * gravity_left_pad}{gravity_line}{' ' * gravity_right_pad}"
-                    temp_padded = f"{' ' * temp_left_pad}{temp_line}{' ' * temp_right_pad}"
+                    # Build the padded content (still no colors)
+                    gravity_padded = " " * gravity_padding_left + gravity_line + " " * gravity_padding_right
+                    temp_padded = " " * temp_padding_left + temp_line + " " * temp_padding_right
                     
-                    # Add colors to the padded content
-                    gravity_colored = f"{COLORS['yellow']}{gravity_padded}{COLORS['green']}"
-                    temp_colored = f"{COLORS['yellow']}{temp_padded}{COLORS['green']}"
+                    # Apply colors to the entire padded content
+                    gravity_colored = COLORS['yellow'] + gravity_padded + COLORS['green']
+                    temp_colored = COLORS['yellow'] + temp_padded + COLORS['green']
                     
-                    # Final verification: ensure exact character count for alignment
-                    gravity_final_width = len(self.strip_ansi(gravity_colored))
-                    temp_final_width = len(self.strip_ansi(temp_colored))
-                    
-                    # Force exact width if somehow off (shouldn't happen but safety check)
-                    if gravity_final_width != 31:
-                        gravity_colored = f"{COLORS['yellow']}{gravity_padded[:31 - (gravity_final_width - 31)].ljust(31)}{COLORS['green']}"
-                    if temp_final_width != 39:
-                        temp_colored = f"{COLORS['yellow']}{temp_padded[:39 - (temp_final_width - 39)].ljust(39)}{COLORS['green']}"
-                    
-                    lines.append(f"│{gravity_colored}│  │{temp_colored}│")
+                    lines.append("│" + gravity_colored + "│  │" + temp_colored + "│")
                 
-                lines.append("│                                 │  │                                         │")
+                # Empty row before values
+                lines.append("│" + " " * GRAVITY_BOX_WIDTH + "│  │" + " " * TEMP_BOX_WIDTH + "│")
                 
                 # Actual values in parentheses centered in boxes
                 sg_text = f"({gravity:.3f} SG)"
                 temp_text = f"({temp_f:.1f}°F / {temp_c:.1f}°C)"
                 
-                sg_padding = (31 - len(sg_text)) // 2
-                temp_val_padding = (39 - len(temp_text)) // 2
+                sg_padding_left = (GRAVITY_BOX_WIDTH - len(sg_text)) // 2
+                sg_padding_right = GRAVITY_BOX_WIDTH - sg_padding_left - len(sg_text)
                 
-                sg_centered = f"{' ' * sg_padding}{sg_text}{' ' * (31 - sg_padding - len(sg_text))}"
-                temp_val_centered = f"{' ' * temp_val_padding}{temp_text}{' ' * (39 - temp_val_padding - len(temp_text))}"
+                temp_text_padding_left = (TEMP_BOX_WIDTH - len(temp_text)) // 2
+                temp_text_padding_right = TEMP_BOX_WIDTH - temp_text_padding_left - len(temp_text)
                 
-                lines.append(f"│{sg_centered}│  │{temp_val_centered}│")
-                lines.append("└─────────────────────────────────┘  └─────────────────────────────────────────┘")
+                sg_centered = " " * sg_padding_left + sg_text + " " * sg_padding_right
+                temp_text_centered = " " * temp_text_padding_left + temp_text + " " * temp_text_padding_right
+                
+                lines.append("│" + sg_centered + "│  │" + temp_text_centered + "│")
+                
+                # Bottom border
+                lines.append("└" + "─" * GRAVITY_BOX_WIDTH + "┘  └" + "─" * TEMP_BOX_WIDTH + "┘")
                 lines.append("")
                 
                 # Status info
@@ -753,31 +764,31 @@ class EasyHistoryMonitor:
                 # History charts side-by-side
                 if device.color in self.logger.hourly_max and self.logger.hourly_max[device.color]:
                     lines.append("HISTORY:")
-                    temp_chart = self.create_hourly_chart(device, "temperature", 20)
                     grav_chart = self.create_hourly_chart(device, "gravity", 20)
+                    temp_chart = self.create_hourly_chart(device, "temperature", 20)
                     
-                    max_chart_lines = max(len(temp_chart), len(grav_chart))
+                    max_chart_lines = max(len(grav_chart), len(temp_chart))
                     for i in range(max_chart_lines):
-                        temp_line = temp_chart[i] if i < len(temp_chart) else ""
                         grav_line = grav_chart[i] if i < len(grav_chart) else ""
+                        temp_line = temp_chart[i] if i < len(temp_chart) else ""
                         # Strip ANSI codes for length calculation
-                        temp_line_clean = self.strip_ansi(temp_line)
-                        padding = 35 - len(temp_line_clean)
-                        lines.append(temp_line + (' ' * max(0, padding)) + grav_line)
+                        grav_line_clean = self.strip_ansi(grav_line)
+                        padding = 35 - len(grav_line_clean)
+                        lines.append(grav_line + (' ' * max(0, padding)) + temp_line)
                     lines.append("")
                 
                 lines.append("-" * 70)
                 lines.append("")
         else:
-            lines.append("┌─────────────────────────────────────────────────────────────────────┐")
-            lines.append("│                     NO TILT DEVICES DETECTED                       │")
-            lines.append("│                                                                     │")
-            lines.append("│  Make sure your Tilt is:                                           │")
-            lines.append("│  - Powered on (LED should blink)                                   │")
-            lines.append("│  - Within 30 feet of this device                                   │")
-            lines.append("│  - Not in sleep mode (shake gently to wake)                        │")
-            lines.append("│                                                                     │")
-            lines.append("└─────────────────────────────────────────────────────────────────────┘")
+            lines.append("┌" + "─" * 68 + "┐")
+            lines.append("│" + " " * 21 + "NO TILT DEVICES DETECTED" + " " * 22 + "│")
+            lines.append("│" + " " * 68 + "│")
+            lines.append("│  Make sure your Tilt is:" + " " * 41 + "│")
+            lines.append("│  - Powered on (LED should blink)" + " " * 33 + "│")
+            lines.append("│  - Within 30 feet of this device" + " " * 32 + "│")
+            lines.append("│  - Not in sleep mode (shake gently to wake)" + " " * 21 + "│")
+            lines.append("│" + " " * 68 + "│")
+            lines.append("└" + "─" * 68 + "┘")
             lines.append("")
         
         # Status line

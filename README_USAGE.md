@@ -127,19 +127,19 @@ The monitor displays:
 [ONLINE] RED TILT - 14:35:22
 ----------------------------------------------------------------------
 
-┌─────────────────────────────────┐  ┌─────────────────────────────────────────┐
-│           GRAVITY               │  │            TEMPERATURE                  │
-│                                 │  │                                         │
-│         ████  ███ █    ███      │  │          ███  ███  ███                 │
-│         █  █ █     █   █        │  │      █  █   █   █ █   █                │
-│         █  █ █     █   █        │  │      █  █   █   █ █   █                │
-│         ████ ████  █   ████     │  │      █  █   █   █ █   █                │
-│            █    █  █      █     │  │      █  █   █   █ █   █                │
-│            █    █  █      █     │  │      █  █   █   █ █   █                │
-│         ███  ███   █   ███      │  │      █   ███   ███  ███                │
-│                                 │  │                                         │
-│          (1.012 SG)             │  │        (72.0°F / 22.2°C)               │
-└─────────────────────────────────┘  └─────────────────────────────────────────┘
+┌─────────────────────────────────┐  ┌─────────────────────────────────┐
+│             GRAVITY             │  │           TEMPERATURE           │
+│                                 │  │                                 │
+│         ████  ███ █    ███      │  │          ███  ███  ███          │
+│         █  █ █     █   █        │  │      █  █   █   █ █   █          │
+│         █  █ █     █   █        │  │      █  █   █   █ █   █          │
+│         ████ ████  █   ████     │  │      █  █   █   █ █   █          │
+│            █    █  █      █     │  │      █  █   █   █ █   █          │
+│            █    █  █      █     │  │      █  █   █   █ █   █          │
+│         ███  ███   █   ███      │  │      █   ███   ███  ███          │
+│                                 │  │                                 │
+│          (1.012 SG)             │  │       (72.0°F / 22.2°C)        │
+└─────────────────────────────────┘  └─────────────────────────────────┘
 
 Signal: -65dBm | Last Update: 14:35:19
 
@@ -149,10 +149,10 @@ GRAV (24h): Current trend charts...
 ```
 
 **Data Display:**
-- **Boxed Layout:** Clear ASCII borders separate gravity and temperature displays
+- **Symmetric Boxed Layout:** Both gravity and temperature use identical 33-character wide boxes
 - **Large ASCII Numbers:** 7-row high display for easy reading from distance  
-- **Centered Values:** Numbers and readings centered within each box
+- **Perfect Centering:** Mathematical centering algorithm ensures precise alignment
 - **Device Status:** Online/Offline indicator with timestamp
 - **Signal Strength:** RSSI value showing connection quality
-- **History Charts:** Visual 24-hour trends for temperature and gravity
+- **Aligned History Charts:** Gravity chart on left, temperature on right (matching big numbers above)
 - **Calibrated Values:** All readings include calibration offsets
