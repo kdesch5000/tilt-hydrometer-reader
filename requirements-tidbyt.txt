@@ -1,0 +1,17 @@
+# Tidbyt Integration Dependencies
+# Install with: pip install -r requirements-tidbyt.txt
+
+# Core dependencies (already in main requirements.txt)
+requests>=2.25.0
+asyncio-mqtt>=0.11.0
+
+# Tidbyt-specific dependencies
+pillow>=9.0.0          # For image generation and manipulation
+numpy>=1.21.0          # For numerical operations in image processing
+
+# Optional: For advanced image generation
+matplotlib>=3.5.0      # For chart generation
+seaborn>=0.11.0        # For enhanced visualizations
+
+# Optional: For WebP format support
+pillow-heif>=0.10.0    # Enhanced image format support

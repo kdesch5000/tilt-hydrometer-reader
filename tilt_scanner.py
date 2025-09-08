@@ -196,8 +196,17 @@ class TiltScanner:
             # Attach our processing function
             btctrl.process = self.process_data
             
-            # Start scanning
-            btctrl.send_scan_request()  # Not a coroutine in 0.2.1
+            # Start scanning - handle both sync and async versions
+            try:
+                if asyncio.iscoroutinefunction(btctrl.send_scan_request):
+                    await btctrl.send_scan_request()
+                else:
+                    btctrl.send_scan_request()
+            except Exception as e:
+                if not self.quiet:
+                    print(f"Error starting scan: {e}")
+                return
+                
             if not self.quiet:
                 print("Bluetooth LE scanning started...")
             
@@ -220,10 +229,13 @@ class TiltScanner:
         finally:
             cleanup_errors = []
             
-            # Stop scanning safely
+            # Stop scanning safely - handle both sync and async versions
             if btctrl:
                 try:
-                    btctrl.stop_scan_request()  # Not a coroutine in 0.2.1
+                    if asyncio.iscoroutinefunction(btctrl.stop_scan_request):
+                        await btctrl.stop_scan_request()
+                    else:
+                        btctrl.stop_scan_request()
                 except Exception as e:
                     cleanup_errors.append(f"Stop scan: {e}")
                     

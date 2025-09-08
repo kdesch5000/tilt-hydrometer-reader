@@ -1,318 +1,169 @@
-# Tilt Hydrometer Terminal Display and Brewstat.us Logger
+# Pixlet
+[![Docs](https://img.shields.io/badge/docs-tidbyt.dev-blue?style=flat-square)](https://tidbyt.dev)
+[![Build & test](https://img.shields.io/github/workflow/status/tidbyt/pixlet/pixlet?style=flat-square)](https://github.com/tidbyt/pixlet/actions)
+[![Discourse](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscuss.tidbyt.com&style=flat-square)](https://discuss.tidbyt.com/)
+[![Discord Server](https://img.shields.io/discord/928484660785336380?style=flat-square)](https://discord.gg/r45MXG4kZc)
+[![GoDoc](https://godoc.org/github.com/tidbyt/pixlet/runtime?status.svg)](https://godoc.org/github.com/tidbyt/pixlet/runtime)
+
+Pixlet is an app runtime and UX toolkit for highly-constrained displays.
+We use Pixlet to develop applets for [Tidbyt](https://tidbyt.com/), which has
+a 64x32 RGB LED matrix display:
+
+[![Example of a Tidbyt](docs/img/tidbyt_1.png)](https://tidbyt.com)
+
+Apps developed with Pixlet can be served in a browser, rendered as WebP or
+GIF animations, or pushed to a physical Tidbyt device.
+
+## Documentation
+
+> Hey! We have a new docs site! Check it out at [tidbyt.dev](https://tidbyt.dev). We'll be updating this repo in the coming weeks.
+
+- [Getting started](#getting-started)
+- [How it works](#how-it-works)
+- [In-depth tutorial](docs/tutorial.md)
+- [Widget reference](docs/widgets.md)
+- [Animation reference](docs/animation.md)
+- [Modules reference](docs/modules.md)
+- [Schema reference](docs/schema/schema.md)
+- [Our thoughts on authoring apps](docs/authoring_apps.md)
+- [Notes on the available fonts](docs/fonts.md)
+
+## Getting started
+
+### Install on macOS
 
 ```
-[ONLINE] RED TILT - 12:16:49
-----------------------------------------------------------------------
-
-┌─────────────────────────────────┐  ┌─────────────────────────────────┐
-│             GRAVITY             │  │           TEMPERATURE           │
-│                                 │  │                                 │
-│    ████      ████ ████ ████     │  │       ████  █        ████       │
-│    █  █      █  █ █  █ █        │  │          █ ██        █  █       │
-│    █  █      █  █ █  █ █        │  │          █  █        █  █       │
-│    █  █      ████ ████ ████     │  │         █   █        █  █       │
-│    █  █         █ █  █ █  █     │  │        █    █        █  █       │
-│    █  █ ███     █ █  █ █  █     │  │       █     █   ███  █  █       │
-│    ████ ███  ████ ████ ████     │  │       █    ████ ███  ████       │
-│                                 │  │                                 │
-│           (0.986 SG)            │  │        (71.0°F / 21.7°C)        │
-└─────────────────────────────────┘  └─────────────────────────────────┘
-
-Signal: -75dBm | Last Update: 12:16:46
-
-HISTORY:
-GRAVITY (1h)                       TEMPERATURE (1h)
-1.486│                               72│ 
-1.319│                               72│ 
-1.153│                               71│ 
-0.986│█                              71│█
-0.819│█                              71│█
-0.653│█                              70│█
-     └─                                 └─
-Now: 0.986                         Now: 71.0°F
-
-----------------------------------------------------------------------
-
-BrewStat.us: ENABLED | CSV: 1 readings | Press: 'q'=quit 'c'=config
+brew install tidbyt/tidbyt/pixlet
 ```
 
-## Project Goals
+### Install on Linux
 
-This project aims to create a standalone Bluetooth data reader for the Tilt hydrometer that runs on Raspberry Pi 5, completely independent of Tilt's official software.
+Download the `pixlet` binary from [the latest release][1].
 
-### Primary Objectives
+Alternatively you can [build from source](docs/BUILD.md).
 
-1. **Direct Bluetooth Communication**: Establish direct Bluetooth Low Energy (BLE) connection with Tilt hydrometer
-2. **Real-time Data Reading**: Continuously read gravity and temperature measurements
-3. **Independent Logging**: Store data locally without relying on Tilt's cloud services or software
-4. **Raspberry Pi 5 Compatibility**: Optimized for Raspberry Pi 5 hardware
-5. **Data Display**: Simple interface to view current and historical readings
+[1]: https://github.com/tidbyt/pixlet/releases/latest
 
-### Key Features
+### Hello, World!
 
-- [x] Bluetooth LE scanning and connection to Tilt devices
-- [x] Parse gravity (specific gravity) and temperature data
-- [x] Local data storage (CSV/JSON format)
-- [x] Terminal-based ASCII art display interface
-- [x] BrewStat.us cloud logging integration
-- [x] Support for multiple Tilt colors/devices
-- [x] Device calibration system
-- [x] Real-time monitoring with instant keyboard controls
+Pixlet applets are written in a simple, Python-like language called
+Starlark. Here's the venerable Hello World program:
 
-### Technical Requirements
-
-- **Platform**: Raspberry Pi 5 with Bluetooth LE support
-- **Programming Language**: Python (preferred for Raspberry Pi ecosystem)
-- **Dependencies**: Bluetooth LE libraries, data storage, terminal UI libraries (curses/rich)
-- **No External Services**: Complete offline operation
-
-## Research Notes
-
-### Tilt Hydrometer Technical Details
-
-#### iBeacon Protocol Specifications
-- **Communication Method**: Bluetooth Low Energy (BLE) using iBeacon advertising packets
-- **Data Broadcasting**: Broadcasts every 5 seconds without requiring connection
-- **Data Format**: 27-octet iBeacon manufacturer-specific data structure
-- **Manufacturer ID**: Apple (4C 00)
-
-#### Data Encoding Format
-```
-iBeacon Structure:
-- FF: Manufacturer specific data type
-- 4C 00: Apple manufacturer ID  
-- 02: iBeacon type (constant)
-- 15: Data length (constant)
-- UUID: 16-byte device identifier (color-specific)
-- Major: 16-bit temperature (°F, big-endian)
-- Minor: 16-bit gravity (*1000, big-endian)  
-- TX Power: 8-bit signal power (dBm)
+```starlark
+load("render.star", "render")
+def main():
+    return render.Root(
+        child = render.Text("Hello, World!")
+    )
 ```
 
-#### Color-Coded Device UUIDs
-Each Tilt color has a unique UUID:
-- **Red**: A495BB10C5B14B44B5121370F02D74DE
-- **Green**: A495BB20C5B14B44B5121370F02D74DE
-- **Black**: A495BB30C5B14B44B5121370F02D74DE
-- **Purple**: A495BB40C5B14B44B5121370F02D74DE
-- **Orange**: A495BB50C5B14B44B5121370F02D74DE
-- **Blue**: A495BB60C5B14B44B5121370F02D74DE
-- **Yellow**: A495BB70C5B14B44B5121370F02D74DE
-- **Pink**: A495BB80C5B14B44B5121370F02D74DE
+Render and serve it with:
 
-#### Data Parsing Algorithm
-```python
-# Temperature (Major field) - degrees Fahrenheit
-temperature = (data[20] << 8) | data[21]
-
-# Specific Gravity (Minor field) - divide by 1000
-gravity = ((data[22] << 8) | data[23]) / 1000.0
+```console
+curl https://raw.githubusercontent.com/tidbyt/pixlet/main/examples/hello_world/hello_world.star | \
+  pixlet serve /dev/stdin
 ```
 
-#### Device Specifications
-- **Gravity Range**: 0.990 to 1.120 SG
-- **Gravity Accuracy**: ±0.002 SG
-- **Temperature Accuracy**: ±1°F (±0.5°C)
-- **Resolution**: 0.001 SG increments, 1°F increments
-- **Update Rate**: Every 5 seconds
+You can view the result by navigating to [http://localhost:8080][3]:
 
-### Implementation Approach
+![](docs/img/tutorial_1.gif)
 
-#### Recommended Python Libraries
+[3]: http://localhost:8080
 
-1. **aioblescan** (Primary Choice)
-   - Async Python library specifically designed for BLE beacon scanning
-   - Proven compatibility with Tilt hydrometers
-   - Can decode iBeacon data automatically
-   - Good Raspberry Pi support
+## How it works
 
-2. **bleak** (Alternative)  
-   - Cross-platform BLE library
-   - **Caution**: Known issues with Raspberry Pi 5
-   - Requires enabling experimental BlueZ features
-   - May need passive scanning mode
+Pixlet scripts are written in a simple, Python-like language called
+[Starlark](https://github.com/google/starlark-go/). The scripts can
+retrieve data over HTTP, transform it and use a collection of
+_Widgets_ to describe how the data should be presented visually.
 
-#### Raspberry Pi 5 Configuration Requirements
-```bash
-# Enable experimental BlueZ features
-echo "Experimental = true" >> /etc/bluetooth/main.conf
-sudo systemctl restart bluetooth
+The Pixlet CLI runs these scripts and renders the result as a WebP
+or GIF animation. You can view the animation in your browser, save
+it, or even push it to a Tidbyt device with `pixlet push`.
+
+### Example: A Clock App
+
+This applet accepts a `timezone` parameter and produces a two frame
+animation displaying the current time with a blinking ':' separator
+between the hour and minute components.
+
+```starlark
+load("render.star", "render")
+load("time.star", "time")
+
+def main(config):
+    timezone = config.get("timezone") or "America/New_York"
+    now = time.now().in_location(timezone)
+
+    return render.Root(
+        delay = 500,
+        child = render.Box(
+            child = render.Animation(
+                children = [
+                    render.Text(
+                        content = now.format("3:04 PM"),
+                        font = "6x13",
+                    ),
+                    render.Text(
+                        content = now.format("3 04 PM"),
+                        font = "6x13",
+                    ),
+                ],
+            ),
+        ),
+    )
 ```
 
-#### Architecture Design
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Tilt Device   │───▶│  BLE Scanner     │───▶│  Data Parser    │
-│   (iBeacon)     │    │  (aioblescan)    │    │  (UUID+Data)    │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                                         │
-┌─────────────────┐    ┌──────────────────┐             ▼
-│ Terminal ASCII  │◄───│  Data Storage    │◄────────────┐
-│   Interface     │    │  (CSV/JSON)      │             │
-└─────────────────┘    └──────────────────┘             │
-                                │                       │
-                                ▼                       │
-                       ┌──────────────────┐             │
-                       │  BrewStat.us     │◄────────────┘
-                       │  Cloud Logger    │
-                       └──────────────────┘
-```
+Here's the resulting image:
 
-#### Development Phases
-1. **Phase 1**: Basic BLE scanning and iBeacon detection
-2. **Phase 2**: Tilt-specific data parsing and validation  
-3. **Phase 3**: Data logging and storage implementation
-4. **Phase 4**: Terminal ASCII art interface with real-time display
-5. **Phase 5**: BrewStat.us API integration for cloud logging
-6. **Phase 6**: Multi-device support and data export
+![](docs/img/clock.gif)
 
-#### Potential Challenges
-- **Raspberry Pi 5 BLE Stack**: Known compatibility issues with some libraries
-- **WiFi Interference**: 2.4GHz WiFi may interfere with BLE on Pi 5
-- **BlueZ Limitations**: May require experimental features enabled
-- **Permission Requirements**: BLE scanning typically requires root privileges
+### Example: A Bitcoin Tracker
 
-### BrewStat.us Cloud Integration
+Applets can get information from external data sources. For example,
+here is a Bitcoin price tracker:
 
-#### API Endpoint
-- **URL Format**: `https://www.brewstat.us/tilt/{API_KEY}/log`
-- **Method**: POST (assumed based on standard cloud logging practices)
-- **Example**: `https://www.brewstat.us/tilt/XXXXXX/log`
+![](docs/img/tutorial_4.gif)
 
-#### Data Format Requirements
-Based on research of similar services, the expected payload likely includes:
-```json
-{
-  "timestamp": "2025-01-07T12:00:00Z",
-  "temperature": 68.5,
-  "gravity": 1.045,
-  "color": "RED",
-  "device_id": "A495BB10C5B14B44B5121370F02D74DE"
-}
+Read the [in-depth tutorial](docs/tutorial.md) to learn how to
+make an applet like this.
+
+## Push to a Tidbyt
+
+If you have a Tidbyt, `pixlet` can push apps directly to it. For example,
+to show the Bitcoin tracker on your Tidbyt:
+
+```console
+# render the bitcoin example
+pixlet render examples/bitcoin/bitcoin.star
+
+# login to your Tidbyt account
+pixlet login
+
+# list available Tidbyt devices
+pixlet devices
+
+# push to your favorite Tidbyt
+pixlet push <YOUR DEVICE ID> examples/bitcoin/bitcoin.webp
 ```
 
-#### Integration Features
-- **Automatic Upload**: Send data every 15 minutes (standard Tilt cloud interval)
-- **Offline Buffering**: Queue data when network unavailable
-- **Error Handling**: Retry failed uploads with exponential backoff
-- **Configuration**: User-provided API key from BrewStat.us account
+To get the ID for a device, run `pixlet devices`. Alternatively, you can
+open the settings for the device in the Tidbyt app on your phone, and tap **Get API key**.
 
-#### Terminal Interface Design
-```
-╔══════════════════════════════════════════════════════════════════════════════════════╗
-║                          🍺 TILT HYDROMETER MONITOR 🍺                              ║
-╠══════════════════════════════════════════════════════════════════════════════════════╣
-║                                                                                      ║
-║  Device: RED TILT                    Status: ●CONNECTED                             ║
-║  Last Update: 2025-01-07 12:34:56    Signal: -65 dBm                               ║
-║                                                                                      ║
-║  ┌─────────────────────────────────┐  ┌─────────────────────────────────────────┐   ║
-║  │        TEMPERATURE              │  │          SPECIFIC GRAVITY               │   ║
-║  │                                 │  │                                         │   ║
-║  │           68.5°F                │  │             1.045                       │   ║
-║  │         (20.3°C)                │  │                                         │   ║
-║  │                                 │  │   ████████████░░░░░                     │   ║
-║  │    ████████████████░░            │  │   Progress: ██████░░ 75%               │   ║
-║  │    Min: 65°F  Max: 72°F         │  │   Start: 1.060  Target: 1.010          │   ║
-║  └─────────────────────────────────┘  └─────────────────────────────────────────┘   ║
-║                                                                                      ║
-║  ┌─────────────────────────────────────────────────────────────────────────────┐   ║
-║  │                       TEMPERATURE HISTORY (14 days)                         │   ║
-║  │ 72°F│                                                              █        │   ║
-║  │ 70°F│  █                                                          █ █       │   ║
-║  │ 68°F│  █ █      █                                               █ █ █ █     │   ║
-║  │ 66°F│  █ █ █    █ █                                          █ █ █ █ █ █    │   ║
-║  │ 64°F│  █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █    │   ║
-║  │     └─────────────────────────────────────────────────────────────────────  │   ║
-║  │     Day: 1  2  3  4  5  6  7  8  9 10 11 12 13 14        (15min intervals) │   ║
-║  └─────────────────────────────────────────────────────────────────────────────┘   ║
-║                                                                                      ║
-║  ┌─────────────────────────────────────────────────────────────────────────────┐   ║
-║  │                        GRAVITY HISTORY (14 days)                            │   ║
-║  │1.060│█                                                                      │   ║
-║  │1.055│█ █                                                                    │   ║
-║  │1.050│█ █ █                                                                  │   ║
-║  │1.045│█ █ █ █                                                               │   ║
-║  │1.040│█ █ █ █ █                                                             │   ║
-║  │1.035│█ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █       │   ║
-║  │     └─────────────────────────────────────────────────────────────────────  │   ║
-║  │     Day: 1  2  3  4  5  6  7  8  9 10 11 12 13 14        (15min intervals) │   ║
-║  └─────────────────────────────────────────────────────────────────────────────┘   ║
-║                                                                                      ║
-║  Cloud Status: BrewStat.us ●CONNECTED    Last Upload: 12:30:01                     ║
-║  Local Log: 1,247 readings               Storage: data/tilt_log_2025-01-07.csv     ║
-║                                                                                      ║
-║  Recent Activity:                                                                   ║
-║  12:34:56  68.5°F  1.045  Steady fermentation                                      ║
-║  12:29:56  68.4°F  1.046  Temperature rising                                       ║
-║  12:24:56  68.2°F  1.047  Gravity dropping                                         ║
-║                                                                                      ║
-║  Press 'q' to quit | 'r' to reset | 's' to save | 'c' to configure                ║
-╚══════════════════════════════════════════════════════════════════════════════════════╝
+If all goes well, you should see the Bitcoin tracker appear on your Tidbyt:
 
-Color Scheme:
-- All text: GREEN
-- Section headings (TEMPERATURE, GRAVITY, etc.): WHITE & BOLD  
-- Bar charts: YELLOW (normal range) / RED (out of range)
-- Status indicators: GREEN (●CONNECTED) / RED (●DISCONNECTED)
+![](docs/img/tidbyt_2.jpg)
+
+## Push as an Installation
+Pushing an applet to your Tidbyt without an installation ID simply displays your applet one time. If you would like your applet to continously display as part of the rotation, add an installation ID to the push command:
+
+```console
+pixlet render examples/bitcoin/bitcoin.star
+pixlet push --installation-id <INSTALLATION ID> <YOUR DEVICE ID> examples/bitcoin/bitcoin.webp
 ```
 
-## Current Implementation
+For example, if we set the `installationID` to "Bitcoin", it would appear in the mobile app as follows:
 
-### Core Applications
+![](docs/img/mobile_1.jpg)
 
-1. **tilt_monitor.py** - Complete terminal ASCII interface monitor
-   - Real-time display with large ASCII numbers for gravity and temperature
-   - Side-by-side history charts for temperature and gravity trends  
-   - Instant keyboard controls (q=quit, c=configure, h=help)
-   - Built-in interactive calibration system for temperature and gravity
-   - BrewStat.us cloud logging with configurable upload intervals
-   - Multi-device support for all 8 Tilt colors
-   - Automatic data logging to CSV files
-
-2. **tilt_scanner.py** - Core Bluetooth scanning engine
-   - iBeacon protocol implementation for Tilt detection
-   - Multi-device scanning and data parsing
-   - Calibration system with offset corrections
-   - Real-time RSSI signal strength monitoring
-
-3. **calibrate_tilt.py** - Device calibration utility
-   - Interactive calibration process
-   - Temperature and gravity offset corrections
-   - Persistent calibration storage
-
-### Usage
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run main monitor (requires root for Bluetooth)
-sudo python3 tilt_monitor.py
-
-# Calibrate devices
-sudo python3 calibrate_tilt.py
-```
-
-### Interface Features
-
-- **Large ASCII Art Numbers**: 7-row high display with perfect mathematical centering
-- **Symmetric Layout**: Identical 33-character wide boxes for gravity and temperature
-- **Real-time Updates**: 3-second refresh cycle
-- **Aligned History Charts**: Gravity and temperature charts positioned below their corresponding big numbers
-- **Signal Monitoring**: RSSI strength and last update timestamps  
-- **Built-in Calibration**: Interactive temperature and gravity calibration system
-- **Cloud Integration**: Automatic BrewStat.us uploads every 15 minutes
-- **Configuration Screen**: Interactive setup for API keys, upload intervals, and device calibration
-- **Instant Controls**: No Enter key required for q/c/h commands
-
-## Project Status
-
-- [x] Project initialization and research
-- [x] Bluetooth protocol implementation (iBeacon/BLE)
-- [x] Library evaluation and aioblescan integration
-- [x] Complete terminal ASCII interface development
-- [x] Multi-device support and calibration system
-- [x] BrewStat.us cloud logging integration
-- [x] Data storage and history tracking
-- [x] Real-time monitoring with instant controls
+**Note:** `pixlet render` executes your Starlark code and generates a WebP image. `pixlet push` deploys the generated WebP image to your device. You'll need to repeat this process if you want to keep the app updated. You can also create [Community Apps](https://github.com/tidbyt/community) that run on Tidbyt’s servers and update automatically.
