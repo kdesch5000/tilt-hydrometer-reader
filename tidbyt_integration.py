@@ -203,8 +203,11 @@ class TidbytPusher:
                 'Authorization': f'Bearer {self.config.api_key}',
             }
             
-            # Create display payload
+            # Create display payload with consistent Installation ID
             image_data = self._create_webp_payload(device)
+            
+            # Use a consistent installation ID based on device color to prevent duplicates
+            consistent_id = f"tilt-{device.color.lower()}-hydrometer"
             
             # If we have binary WebP data, encode it properly
             if isinstance(image_data, bytes):
@@ -212,7 +215,7 @@ class TidbytPusher:
                 image_b64 = base64.b64encode(image_data).decode('utf-8')
                 headers['Content-Type'] = 'application/json'
                 payload = {
-                    'installationID': self.config.installation_id,
+                    'installationID': consistent_id,
                     'image': image_b64,
                     'background': False
                 }
@@ -220,7 +223,7 @@ class TidbytPusher:
                 # Fallback JSON data
                 headers['Content-Type'] = 'application/json'
                 payload = {
-                    'installationID': self.config.installation_id,
+                    'installationID': consistent_id,
                     'image': image_data.decode('utf-8') if isinstance(image_data, bytes) else image_data,
                     'background': False
                 }
