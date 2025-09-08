@@ -1,5 +1,39 @@
 # Tilt Hydrometer Terminal Display and Brewstat.us Logger
 
+[ONLINE] RED TILT - 12:16:49
+----------------------------------------------------------------------
+
+┌─────────────────────────────────┐  ┌─────────────────────────────────┐
+│             GRAVITY             │  │           TEMPERATURE           │
+│                                 │  │                                 │
+│    ████      ████ ████ ████     │  │       ████  █        ████       │
+│    █  █      █  █ █  █ █        │  │          █ ██        █  █       │
+│    █  █      █  █ █  █ █        │  │          █  █        █  █       │
+│    █  █      ████ ████ ████     │  │         █   █        █  █       │
+│    █  █         █ █  █ █  █     │  │        █    █        █  █       │
+│    █  █ ███     █ █  █ █  █     │  │       █     █   ███  █  █       │
+│    ████ ███  ████ ████ ████     │  │       █    ████ ███  ████       │
+│                                 │  │                                 │
+│           (0.986 SG)            │  │        (71.0°F / 21.7°C)        │
+└─────────────────────────────────┘  └─────────────────────────────────┘
+
+Signal: -75dBm | Last Update: 12:16:46
+
+HISTORY:
+GRAVITY (1h)                       TEMPERATURE (1h)
+1.486│                               72│ 
+1.319│                               72│ 
+1.153│                               71│ 
+0.986│█                              71│█
+0.819│█                              71│█
+0.653│█                              70│█
+     └─                                 └─
+Now: 0.986                         Now: 71.0°F
+
+----------------------------------------------------------------------
+
+BrewStat.us: ENABLED | CSV: 1 readings | Press: 'q'=quit 'c'=config
+
 ## Project Goals
 
 This project aims to create a standalone Bluetooth data reader for the Tilt hydrometer that runs on Raspberry Pi 5, completely independent of Tilt's official software.
