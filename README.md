@@ -1,4 +1,4 @@
-# Tilt Hydrometer Bluetooth Reader
+# Tilt Hydrometer Terminal Display and Brewstat.us Logger
 
 ## Project Goals
 
