@@ -69,11 +69,12 @@ class TiltDevice:
 class TiltScanner:
     """Main scanner class for detecting and reading Tilt hydrometers"""
     
-    def __init__(self, device_id=0):
+    def __init__(self, device_id=0, quiet=False):
         self.devices: Dict[str, TiltDevice] = {}
         self.running = False
         self.device_id = device_id
         self.tilt_decoder = Tilt()
+        self.quiet = quiet
         
     def process_data(self, data):
         """Process BLE advertisement data using aioblescan format"""
@@ -116,27 +117,20 @@ class TiltScanner:
             mac_addr = data.get("mac", mac)
             
             # Determine color from UUID
-            # Debug what we're getting
-            print(f"Debug: Raw UUID from plugin: '{uuid}'")
-            
             # The UUID might have A495 duplicated, let's clean it up
             clean_uuid = uuid.upper()
             
             # If UUID starts with A495A495, remove the duplicate
             if clean_uuid.startswith("A495A495"):
                 clean_uuid = clean_uuid[4:]  # Remove first A495
-                print(f"Debug: Removed duplicate A495, now: '{clean_uuid}'")
             
             # Check against our known UUIDs
             color = "UNKNOWN"
             if clean_uuid in TILT_UUIDS:
                 color = TILT_UUIDS[clean_uuid]
-                print(f"Debug: Matched! Color is {color}")
             
             if color == "UNKNOWN":
-                print(f"Debug: No match found for UUID: {clean_uuid}")
-                print(f"Debug: Available UUIDs: {list(TILT_UUIDS.keys())}")
-                return
+                return  # Silently skip unknown UUIDs for clean monitor display
                 
             # Use clean UUID as device key
             device_key = clean_uuid
@@ -144,30 +138,35 @@ class TiltScanner:
             # Get or create device
             if device_key not in self.devices:
                 self.devices[device_key] = TiltDevice(color, device_key)
-                print(f"[DISCOVERED] {color} Tilt detected (UUID: {clean_uuid}, MAC: {mac_addr})")
+                if not self.quiet:
+                    print(f"[DISCOVERED] {color} Tilt detected (UUID: {clean_uuid}, MAC: {mac_addr})")
             
             # Update device reading
             self.devices[device_key].update_reading(temp_f, gravity, rssi_val)
             
-            # Print reading
-            device = self.devices[device_key]
-            print(f"[{color}] Raw: {temp_f:.1f}°F, {gravity:.3f} SG | "
-                  f"Calibrated: {device.get_calibrated_temperature_f():.1f}°F "
-                  f"({device.get_calibrated_temperature_c():.1f}°C), "
-                  f"{device.get_calibrated_gravity():.3f} SG | "
-                  f"RSSI: {rssi_val} dBm")
+            # Print reading only if not in quiet mode
+            if not self.quiet:
+                device = self.devices[device_key]
+                print(f"[{color}] Raw: {temp_f:.1f}°F, {gravity:.3f} SG | "
+                      f"Calibrated: {device.get_calibrated_temperature_f():.1f}°F "
+                      f"({device.get_calibrated_temperature_c():.1f}°C), "
+                      f"{device.get_calibrated_gravity():.3f} SG | "
+                      f"RSSI: {rssi_val} dBm")
                       
         except json.JSONDecodeError as e:
-            print(f"Error parsing Tilt JSON: {e}")
-            print(f"Result string: {result_str}")
+            if not self.quiet:
+                print(f"Error parsing Tilt JSON: {e}")
+                print(f"Result string: {result_str}")
         except Exception as e:
-            print(f"Error processing Tilt data: {e}")
-            print(f"Result string: {result_str}")
+            if not self.quiet:
+                print(f"Error processing Tilt data: {e}")
+                print(f"Result string: {result_str}")
                         
     async def scan(self, duration: int = 30):
         """Scan for Tilt devices for specified duration"""
-        print(f"Starting Tilt scan for {duration} seconds...")
-        print("Looking for Tilt hydrometers...")
+        if not self.quiet:
+            print(f"Starting Tilt scan for {duration} seconds...")
+            print("Looking for Tilt hydrometers...")
         
         conn = None
         btctrl = None
@@ -178,24 +177,29 @@ class TiltScanner:
             # Create Bluetooth socket
             mysocket = aiobs.create_bt_socket(self.device_id)
             
-            # Create connection using the correct method
+            # Create connection using stable method
             try:
-                # Try the new method first
-                conn, btctrl = await event_loop._create_connection_transport(
-                    mysocket, aiobs.BLEScanRequester, None, None
-                )
-            except AttributeError:
-                # Fallback to older method if _create_connection_transport doesn't exist
+                # Use the standard create_connection method
                 conn, btctrl = await event_loop.create_connection(
                     aiobs.BLEScanRequester, sock=mysocket
                 )
+            except Exception as connect_error:
+                # If that fails, try alternative method
+                try:
+                    conn, btctrl = await event_loop._create_connection_transport(
+                        mysocket, aiobs.BLEScanRequester, None, None
+                    )
+                except Exception:
+                    # Re-raise original connection error
+                    raise connect_error
             
             # Attach our processing function
             btctrl.process = self.process_data
             
             # Start scanning
-            btctrl.send_scan_request()  # Not a coroutine
-            print("Bluetooth LE scanning started...")
+            btctrl.send_scan_request()  # Not a coroutine in 0.2.1
+            if not self.quiet:
+                print("Bluetooth LE scanning started...")
             
             self.running = True
             
@@ -203,26 +207,39 @@ class TiltScanner:
             await asyncio.sleep(duration)
             
         except PermissionError as e:
-            print(f"Permission denied: {e}")
-            print("Make sure to run with sudo privileges")
+            if not self.quiet:
+                print(f"Permission denied: {e}")
+                print("Make sure to run with sudo privileges")
             return
         except Exception as e:
-            print(f"Error during scanning: {e}")
-            print("Make sure Bluetooth is enabled and you have proper permissions")
+            if not self.quiet:
+                print(f"Error during scanning: {e}")
+                print("Make sure Bluetooth is enabled and you have proper permissions")
             return
             
         finally:
-            try:
-                if btctrl:
-                    # Stop scanning
-                    btctrl.stop_scan_request()  # Not a coroutine
-                if conn:
+            cleanup_errors = []
+            
+            # Stop scanning safely
+            if btctrl:
+                try:
+                    btctrl.stop_scan_request()  # Not a coroutine in 0.2.1
+                except Exception as e:
+                    cleanup_errors.append(f"Stop scan: {e}")
+                    
+            # Close connection safely
+            if conn:
+                try:
                     conn.close()
-                self.running = False
+                except Exception as e:
+                    cleanup_errors.append(f"Close connection: {e}")
+                    
+            self.running = False
+            
+            if not self.quiet:
+                if cleanup_errors:
+                    print(f"Cleanup warnings: {', '.join(cleanup_errors)}")
                 print(f"\nScan completed. Found {len(self.devices)} Tilt device(s).")
-            except Exception as e:
-                print(f"Error during cleanup: {e}")
-                pass
         
     def list_devices(self):
         """List all discovered devices"""
