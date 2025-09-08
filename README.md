@@ -229,6 +229,7 @@ Color Scheme:
    - Real-time display with large ASCII numbers for gravity and temperature
    - Side-by-side history charts for temperature and gravity trends  
    - Instant keyboard controls (q=quit, c=configure, h=help)
+   - Built-in interactive calibration system for temperature and gravity
    - BrewStat.us cloud logging with configurable upload intervals
    - Multi-device support for all 8 Tilt colors
    - Automatic data logging to CSV files
@@ -263,8 +264,9 @@ sudo python3 calibrate_tilt.py
 - **Real-time Updates**: 3-second refresh cycle
 - **History Charts**: 24-hour temperature and gravity trends
 - **Signal Monitoring**: RSSI strength and last update timestamps  
+- **Built-in Calibration**: Interactive temperature and gravity calibration system
 - **Cloud Integration**: Automatic BrewStat.us uploads every 15 minutes
-- **Configuration Screen**: Interactive setup for API keys and settings
+- **Configuration Screen**: Interactive setup for API keys, upload intervals, and device calibration
 - **Instant Controls**: No Enter key required for q/c/h commands
 
 ## Project Status

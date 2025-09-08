@@ -39,8 +39,28 @@ sudo python3 tilt_monitor.py
 Press 'c' to access the interactive configuration menu:
 1. **Change API Key** - Set your BrewStat.us API key
 2. **Change Upload Interval** - Adjust cloud upload frequency (1-60 minutes)
-3. **Disable BrewStat.us** - Turn off cloud logging
-4. **Return to monitor** - Go back to main display
+3. **Calibrate Devices** - Interactive calibration for temperature and gravity
+4. **Disable BrewStat.us** - Turn off cloud logging
+5. **Return to monitor** - Go back to main display
+
+### Device Calibration (New!)
+The built-in calibration system allows you to calibrate each Tilt device directly from the configuration screen:
+
+**Temperature Calibration:**
+- Use an accurate thermometer in the same liquid as the Tilt
+- Enter the actual temperature to calculate offset
+- Instant feedback on calibration accuracy
+
+**Gravity Calibration:**
+- Use distilled water (1.000 SG) for basic calibration
+- Or use calibrated solutions for precision brewing
+- Validates input range to prevent errors
+
+**Features:**
+- Calibrate temperature only, gravity only, or both
+- Reset calibration to remove all offsets
+- Shows current offsets for each device
+- Automatic calibration data persistence
 
 ### Calibration Process
 
@@ -107,17 +127,19 @@ The monitor displays:
 [ONLINE] RED TILT - 14:35:22
 ----------------------------------------------------------------------
 
-GRAVITY                    TEMPERATURE
-
-████  ███ █    ███             ███  ███  ███
-█  █ █     █   █           █  █   █   █ █   █
-█  █ █     █   █           █  █   █   █ █   █
-████ ████  █   ████        █  █   █   █ █   █
-   █    █  █      █        █  █   █   █ █   █  
-   █    █  █      █        █  █   █   █ █   █
-███  ███   █   ███         █   ███   ███  ███
-
-(1.012 SG)               (72.0°F / 22.2°C)
+┌─────────────────────────────────┐  ┌─────────────────────────────────────────┐
+│           GRAVITY               │  │            TEMPERATURE                  │
+│                                 │  │                                         │
+│         ████  ███ █    ███      │  │          ███  ███  ███                 │
+│         █  █ █     █   █        │  │      █  █   █   █ █   █                │
+│         █  █ █     █   █        │  │      █  █   █   █ █   █                │
+│         ████ ████  █   ████     │  │      █  █   █   █ █   █                │
+│            █    █  █      █     │  │      █  █   █   █ █   █                │
+│            █    █  █      █     │  │      █  █   █   █ █   █                │
+│         ███  ███   █   ███      │  │      █   ███   ███  ███                │
+│                                 │  │                                         │
+│          (1.012 SG)             │  │        (72.0°F / 22.2°C)               │
+└─────────────────────────────────┘  └─────────────────────────────────────────┘
 
 Signal: -65dBm | Last Update: 14:35:19
 
@@ -127,7 +149,9 @@ GRAV (24h): Current trend charts...
 ```
 
 **Data Display:**
-- **Large ASCII Numbers:** 7-row high display for easy reading from distance
+- **Boxed Layout:** Clear ASCII borders separate gravity and temperature displays
+- **Large ASCII Numbers:** 7-row high display for easy reading from distance  
+- **Centered Values:** Numbers and readings centered within each box
 - **Device Status:** Online/Offline indicator with timestamp
 - **Signal Strength:** RSSI value showing connection quality
 - **History Charts:** Visual 24-hour trends for temperature and gravity

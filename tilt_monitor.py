@@ -322,6 +322,206 @@ class EasyHistoryMonitor:
             rows.append(" ".join(row_parts[i]))
         
         return rows
+
+    async def _handle_calibration_menu(self):
+        """Handle the calibration submenu"""
+        print(COLORS['clear_screen'], end='', flush=True)
+        
+        # Show available devices
+        print(COLORS['black_bg'] + COLORS['green'])
+        print(COLORS['bold_white'] + "=" * 60 + COLORS['green'])
+        print("                 DEVICE CALIBRATION")
+        print(COLORS['bold_white'] + "=" * 60 + COLORS['green'])
+        print("")
+        
+        if not self.scanner.devices:
+            print("No Tilt devices detected!")
+            print("Make sure your Tilt is powered on and nearby.")
+            input("\nPress Enter to continue...")
+            return
+            
+        # List available devices
+        device_list = list(self.scanner.devices.values())
+        print("Available devices:")
+        for i, device in enumerate(device_list, 1):
+            status = "ONLINE" if device.last_seen and (datetime.now() - device.last_seen).seconds < 30 else "OFFLINE"
+            print(f"{i}. {device.color} TILT - {status}")
+            if device.last_seen:
+                temp_f = device.get_calibrated_temperature_f()
+                gravity = device.get_calibrated_gravity()
+                print(f"   Current: {temp_f:.1f}°F, {gravity:.3f} SG")
+                if hasattr(device, 'temp_offset') and hasattr(device, 'gravity_offset'):
+                    print(f"   Offsets: {device.temp_offset:+.1f}°F, {device.gravity_offset:+.4f} SG")
+        
+        print("")
+        print("0. Return to configuration menu")
+        print("")
+        
+        try:
+            choice = input("Select device to calibrate > ").strip()
+            
+            if choice == '0':
+                return
+                
+            device_num = int(choice)
+            if 1 <= device_num <= len(device_list):
+                selected_device = device_list[device_num - 1]
+                await self._calibrate_device(selected_device)
+            else:
+                print("Invalid selection")
+                input("\nPress Enter to continue...")
+                
+        except ValueError:
+            print("Invalid input")
+            input("\nPress Enter to continue...")
+        except KeyboardInterrupt:
+            print("\nCalibration cancelled")
+            
+    async def _calibrate_device(self, device):
+        """Calibrate a specific device"""
+        print(COLORS['clear_screen'], end='', flush=True)
+        
+        print(COLORS['black_bg'] + COLORS['green'])
+        print(COLORS['bold_white'] + "=" * 60 + COLORS['green'])
+        print(f"           CALIBRATING {device.color} TILT")
+        print(COLORS['bold_white'] + "=" * 60 + COLORS['green'])
+        print("")
+        
+        # Show current readings
+        temp_f = device.get_calibrated_temperature_f()
+        temp_c = device.get_calibrated_temperature_c()
+        gravity = device.get_calibrated_gravity()
+        
+        print(f"Current readings:")
+        print(f"  Temperature: {temp_f:.1f}°F ({temp_c:.1f}°C)")
+        print(f"  Gravity: {gravity:.3f} SG")
+        print("")
+        
+        if hasattr(device, 'temp_offset') and hasattr(device, 'gravity_offset'):
+            print(f"Current offsets:")
+            print(f"  Temperature: {device.temp_offset:+.1f}°F")
+            print(f"  Gravity: {device.gravity_offset:+.4f} SG")
+            print("")
+        
+        print("Calibration Instructions:")
+        print("1. For temperature: Use an accurate thermometer in the same liquid")
+        print("2. For gravity: Use distilled water (1.000 SG) or calibrated solution")
+        print("3. Let readings stabilize for 2-3 minutes before calibrating")
+        print("")
+        
+        print("What would you like to calibrate?")
+        print("1. Temperature only")
+        print("2. Gravity only") 
+        print("3. Both temperature and gravity")
+        print("4. Reset calibration (remove offsets)")
+        print("0. Return to device menu")
+        print("")
+        
+        try:
+            choice = input("Select calibration type > ").strip()
+            
+            if choice == '0':
+                return
+            elif choice == '1':
+                await self._calibrate_temperature(device)
+            elif choice == '2':
+                await self._calibrate_gravity(device)
+            elif choice == '3':
+                await self._calibrate_temperature(device)
+                await self._calibrate_gravity(device)
+            elif choice == '4':
+                device.temp_offset = 0.0
+                device.gravity_offset = 0.0
+                self.scanner.save_calibration()
+                print("✅ Calibration reset! All offsets set to zero.")
+                input("\nPress Enter to continue...")
+            else:
+                print("Invalid selection")
+                input("\nPress Enter to continue...")
+                
+        except KeyboardInterrupt:
+            print("\nCalibration cancelled")
+            
+    async def _calibrate_temperature(self, device):
+        """Calibrate temperature for a device"""
+        print(f"\n--- Temperature Calibration for {device.color} TILT ---")
+        print(f"Current reading: {device.get_calibrated_temperature_f():.1f}°F")
+        print("")
+        print("Enter the actual temperature as measured by an accurate thermometer:")
+        
+        try:
+            actual_temp = float(input("Actual temperature (°F) > ").strip())
+            
+            # Calculate new offset
+            current_raw_temp = device.temperature_f
+            new_offset = actual_temp - current_raw_temp
+            
+            print(f"\nCalculating offset:")
+            print(f"  Actual temperature: {actual_temp:.1f}°F")
+            print(f"  Tilt raw reading: {current_raw_temp:.1f}°F") 
+            print(f"  New offset: {new_offset:+.1f}°F")
+            
+            confirm = input(f"\nApply this calibration? (y/N) > ").strip().lower()
+            if confirm == 'y':
+                device.temp_offset = new_offset
+                self.scanner.save_calibration()
+                print("✅ Temperature calibration saved!")
+                print(f"New calibrated reading: {device.get_calibrated_temperature_f():.1f}°F")
+            else:
+                print("Temperature calibration cancelled")
+                
+        except ValueError:
+            print("Invalid temperature value")
+        except KeyboardInterrupt:
+            print("\nTemperature calibration cancelled")
+            
+        input("\nPress Enter to continue...")
+        
+    async def _calibrate_gravity(self, device):
+        """Calibrate gravity for a device"""
+        print(f"\n--- Gravity Calibration for {device.color} TILT ---")
+        print(f"Current reading: {device.get_calibrated_gravity():.3f} SG")
+        print("")
+        print("Enter the actual specific gravity:")
+        print("  - Use 1.000 for distilled water")
+        print("  - Use calibrated solution value if available")
+        
+        try:
+            actual_gravity = float(input("Actual gravity (SG) > ").strip())
+            
+            # Validate reasonable gravity range
+            if actual_gravity < 0.990 or actual_gravity > 1.150:
+                print("⚠️  Warning: Gravity value outside normal range (0.990-1.150)")
+                confirm_range = input("Continue anyway? (y/N) > ").strip().lower()
+                if confirm_range != 'y':
+                    print("Gravity calibration cancelled")
+                    input("\nPress Enter to continue...")
+                    return
+            
+            # Calculate new offset
+            current_raw_gravity = device.specific_gravity
+            new_offset = actual_gravity - current_raw_gravity
+            
+            print(f"\nCalculating offset:")
+            print(f"  Actual gravity: {actual_gravity:.3f} SG")
+            print(f"  Tilt raw reading: {current_raw_gravity:.3f} SG")
+            print(f"  New offset: {new_offset:+.4f} SG")
+            
+            confirm = input(f"\nApply this calibration? (y/N) > ").strip().lower()
+            if confirm == 'y':
+                device.gravity_offset = new_offset
+                self.scanner.save_calibration()
+                print("✅ Gravity calibration saved!")
+                print(f"New calibrated reading: {device.get_calibrated_gravity():.3f} SG")
+            else:
+                print("Gravity calibration cancelled")
+                
+        except ValueError:
+            print("Invalid gravity value")
+        except KeyboardInterrupt:
+            print("\nGravity calibration cancelled")
+            
+        input("\nPress Enter to continue...")
         
     def signal_handler(self, signum, frame):
         print("\nShutting down...")
@@ -484,22 +684,62 @@ class EasyHistoryMonitor:
                 gravity_lines = self.create_large_number(gravity, 3)
                 temp_lines = self.create_large_number(temp_f, 1)
                 
-                lines.append("GRAVITY                    TEMPERATURE")
-                lines.append("")
+                # Create boxes around gravity and temperature displays
+                lines.append("┌─────────────────────────────────┐  ┌─────────────────────────────────────────┐")
+                lines.append("│           GRAVITY               │  │            TEMPERATURE                  │")
+                lines.append("│                                 │  │                                         │")
                 
-                # Display ASCII art with fixed spacing using strip_ansi (7 rows)
-                gravity_width = len(self.strip_ansi(gravity_lines[0]))
-                spaces_needed = 27 - gravity_width  # Fixed column position
-                
+                # Display ASCII art with perfect fixed-width alignment inside boxes (7 rows)
                 for i in range(7):
-                    lines.append(f"{COLORS['yellow']}{gravity_lines[i]}{COLORS['green']}{' ' * spaces_needed}{COLORS['yellow']}{temp_lines[i]}{COLORS['green']}")
+                    # Get raw ASCII line without colors
+                    gravity_line = gravity_lines[i]
+                    temp_line = temp_lines[i]
+                    
+                    # Calculate actual display width (without ANSI color codes)
+                    gravity_line_width = len(self.strip_ansi(gravity_line))
+                    temp_line_width = len(self.strip_ansi(temp_line))
+                    
+                    # Calculate padding to center within fixed box width
+                    gravity_left_pad = (31 - gravity_line_width) // 2
+                    gravity_right_pad = 31 - gravity_left_pad - gravity_line_width
+                    
+                    temp_left_pad = (39 - temp_line_width) // 2  
+                    temp_right_pad = 39 - temp_left_pad - temp_line_width
+                    
+                    # Build content with exact fixed width (no colors in padding calculation)
+                    gravity_padded = f"{' ' * gravity_left_pad}{gravity_line}{' ' * gravity_right_pad}"
+                    temp_padded = f"{' ' * temp_left_pad}{temp_line}{' ' * temp_right_pad}"
+                    
+                    # Add colors to the padded content
+                    gravity_colored = f"{COLORS['yellow']}{gravity_padded}{COLORS['green']}"
+                    temp_colored = f"{COLORS['yellow']}{temp_padded}{COLORS['green']}"
+                    
+                    # Final verification: ensure exact character count for alignment
+                    gravity_final_width = len(self.strip_ansi(gravity_colored))
+                    temp_final_width = len(self.strip_ansi(temp_colored))
+                    
+                    # Force exact width if somehow off (shouldn't happen but safety check)
+                    if gravity_final_width != 31:
+                        gravity_colored = f"{COLORS['yellow']}{gravity_padded[:31 - (gravity_final_width - 31)].ljust(31)}{COLORS['green']}"
+                    if temp_final_width != 39:
+                        temp_colored = f"{COLORS['yellow']}{temp_padded[:39 - (temp_final_width - 39)].ljust(39)}{COLORS['green']}"
+                    
+                    lines.append(f"│{gravity_colored}│  │{temp_colored}│")
                 
-                lines.append("")
-                # Actual values in parentheses with fixed spacing
+                lines.append("│                                 │  │                                         │")
+                
+                # Actual values in parentheses centered in boxes
                 sg_text = f"({gravity:.3f} SG)"
                 temp_text = f"({temp_f:.1f}°F / {temp_c:.1f}°C)"
-                spaces_for_values = 27 - len(sg_text)
-                lines.append(f"{sg_text}{' ' * spaces_for_values}{temp_text}")
+                
+                sg_padding = (31 - len(sg_text)) // 2
+                temp_val_padding = (39 - len(temp_text)) // 2
+                
+                sg_centered = f"{' ' * sg_padding}{sg_text}{' ' * (31 - sg_padding - len(sg_text))}"
+                temp_val_centered = f"{' ' * temp_val_padding}{temp_text}{' ' * (39 - temp_val_padding - len(temp_text))}"
+                
+                lines.append(f"│{sg_centered}│  │{temp_val_centered}│")
+                lines.append("└─────────────────────────────────┘  └─────────────────────────────────────────┘")
                 lines.append("")
                 
                 # Status info
@@ -529,12 +769,15 @@ class EasyHistoryMonitor:
                 lines.append("-" * 70)
                 lines.append("")
         else:
-            lines.append("NO TILT DEVICES DETECTED")
-            lines.append("")
-            lines.append("Make sure your Tilt is:")
-            lines.append("- Powered on (LED should blink)")
-            lines.append("- Within 30 feet of this device")
-            lines.append("- Not in sleep mode (shake gently to wake)")
+            lines.append("┌─────────────────────────────────────────────────────────────────────┐")
+            lines.append("│                     NO TILT DEVICES DETECTED                       │")
+            lines.append("│                                                                     │")
+            lines.append("│  Make sure your Tilt is:                                           │")
+            lines.append("│  - Powered on (LED should blink)                                   │")
+            lines.append("│  - Within 30 feet of this device                                   │")
+            lines.append("│  - Not in sleep mode (shake gently to wake)                        │")
+            lines.append("│                                                                     │")
+            lines.append("└─────────────────────────────────────────────────────────────────────┘")
             lines.append("")
         
         # Status line
@@ -603,8 +846,9 @@ class EasyHistoryMonitor:
                     print(COLORS['bold_white'] + "=" * 60 + COLORS['green'])
                     print("1. Change API Key")
                     print("2. Change Upload Interval") 
-                    print("3. Disable BrewStat.us")
-                    print("4. Return to monitor")
+                    print("3. Calibrate Devices")
+                    print("4. Disable BrewStat.us")
+                    print("5. Return to monitor")
                     print(COLORS['bold_white'] + "=" * 60 + COLORS['green'])
                     print("")  # Extra line before prompt
                     
@@ -617,7 +861,7 @@ class EasyHistoryMonitor:
                         original_handler = signal.signal(signal.SIGINT, config_signal_handler)
                         
                         try:
-                            choice = input("Select option (1-4) > ").strip()
+                            choice = input("Select option (1-5) > ").strip()
                             
                             if choice == '1':
                                 print("\nEnter your BrewStat.us API key:")
@@ -646,6 +890,10 @@ class EasyHistoryMonitor:
                                     print("Invalid input. Please enter a number.")
                                     
                             elif choice == '3':
+                                # Calibration menu
+                                await self._handle_calibration_menu()
+                                    
+                            elif choice == '4':
                                 confirm = input("Disable BrewStat.us uploads? (y/N) > ").strip().lower()
                                 if confirm == 'y':
                                     self.brewstat.enabled = False
@@ -654,7 +902,7 @@ class EasyHistoryMonitor:
                                 else:
                                     print("BrewStat.us remains enabled")
                                     
-                            elif choice == '4':
+                            elif choice == '5':
                                 print("Returning to monitor...")
                             else:
                                 print("Invalid choice")
