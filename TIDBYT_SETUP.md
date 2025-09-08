@@ -46,17 +46,15 @@ pip install -r requirements-tidbyt.txt --break-system-packages
 
 You need three pieces of information:
 
-#### Device ID
-1. Open the Tidbyt mobile app
-2. Go to Settings → General → Device ID
-3. Copy the Device ID (looks like: `device_12345`)
+#### Device ID and API Key (from Mobile App)
+1. Open the **Tidbyt mobile app** on your phone
+2. Go to **Settings** → **Developer** → **Get API Key**
+3. This will show you both:
+   - **Device ID** (looks like: `wordlessly-romantic-unfailing-whitefly-31b`)
+   - **API Key** (a long JWT token starting with `eyJ`)
+4. Copy both values for configuration
 
-#### API Key  
-1. Visit https://tidbyt.dev
-2. Sign up or log in
-3. Go to API Keys section
-4. Create a new API key
-5. Copy the API key (starts with `tidbyt_`)
+**Note**: The web login at tidbyt.dev may not work reliably. The mobile app method is the recommended approach.
 
 #### Installation ID
 This will be auto-generated during configuration, or you can create your own unique identifier.
