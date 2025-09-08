@@ -1,32 +1,46 @@
-# Tilt Scanner Usage Guide
+# Tilt Hydrometer Monitor Usage Guide
 
 ## Setup
 
-1. **Create virtual environment:**
+1. **Install dependencies:**
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
    pip install -r requirements.txt
    ```
 
-2. **Run programs with root privileges** (required for Bluetooth access):
+2. **Run with root privileges** (required for Bluetooth access):
    ```bash
-   sudo ./venv/bin/python tilt_scanner.py
-   sudo ./venv/bin/python calibrate_tilt.py
+   sudo python3 tilt_monitor.py
    ```
 
-## Basic Usage
+## Main Monitor Application
 
-### Scanning for Tilts
+### Terminal ASCII Interface
+The main monitor (`tilt_monitor.py`) provides a complete real-time ASCII interface:
+
 ```bash
-sudo ./venv/bin/python tilt_scanner.py
+sudo python3 tilt_monitor.py
 ```
-This will:
-- Scan for 30 seconds
-- Detect all Tilt colors automatically
-- Show real-time readings
-- Display calibrated values
-- Save calibration data
+
+**Features:**
+- Large 7-row ASCII numbers for gravity and temperature
+- Side-by-side history charts (24-hour trends)
+- Real-time updates every 3 seconds
+- Instant keyboard controls (no Enter key required)
+- BrewStat.us cloud logging integration
+- Multi-device support for all Tilt colors
+
+### Keyboard Controls
+- **q** - Quit the monitor
+- **c** - Open configuration screen for BrewStat.us settings
+- **h** - Show help menu
+- **Ctrl+C** - Emergency quit
+
+### Configuration Screen
+Press 'c' to access the interactive configuration menu:
+1. **Change API Key** - Set your BrewStat.us API key
+2. **Change Upload Interval** - Adjust cloud upload frequency (1-60 minutes)
+3. **Disable BrewStat.us** - Turn off cloud logging
+4. **Return to monitor** - Go back to main display
 
 ### Calibration Process
 
@@ -85,12 +99,36 @@ Calibration data is stored in `tilt_calibration.json`:
 - Use clean water at room temperature for best results
 - Let Tilt stabilize before taking readings
 
-## Output Format
+## Display Layout
+
+The monitor displays:
 
 ```
-[RED] Raw: 68.2°F, 1.045 SG | Calibrated: 68.7°F (20.4°C), 1.047 SG | RSSI: -65 dBm
+[ONLINE] RED TILT - 14:35:22
+----------------------------------------------------------------------
+
+GRAVITY                    TEMPERATURE
+
+████  ███ █    ███             ███  ███  ███
+█  █ █     █   █           █  █   █   █ █   █
+█  █ █     █   █           █  █   █   █ █   █
+████ ████  █   ████        █  █   █   █ █   █
+   █    █  █      █        █  █   █   █ █   █  
+   █    █  █      █        █  █   █   █ █   █
+███  ███   █   ███         █   ███   ███  ███
+
+(1.012 SG)               (72.0°F / 22.2°C)
+
+Signal: -65dBm | Last Update: 14:35:19
+
+HISTORY:
+TEMP (24h): Current trend charts...
+GRAV (24h): Current trend charts...
 ```
 
-- **Raw:** Direct readings from Tilt
-- **Calibrated:** Adjusted readings with offsets applied  
-- **RSSI:** Signal strength (closer to 0 = stronger signal)
+**Data Display:**
+- **Large ASCII Numbers:** 7-row high display for easy reading from distance
+- **Device Status:** Online/Offline indicator with timestamp
+- **Signal Strength:** RSSI value showing connection quality
+- **History Charts:** Visual 24-hour trends for temperature and gravity
+- **Calibrated Values:** All readings include calibration offsets
