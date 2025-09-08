@@ -14,6 +14,7 @@ import requests
 import termios
 import tty
 import select
+import argparse
 from datetime import datetime, timedelta
 from typing import Dict, List
 from dataclasses import dataclass
@@ -274,10 +275,17 @@ class EasyBrewStatLogger:
             return False
 
 class EasyHistoryMonitor:
-    def __init__(self):
+    def __init__(self, enable_tidbyt=False):
         self.scanner = TiltScanner(quiet=True)
         self.logger = EasyHistoryLogger()
         self.brewstat = EasyBrewStatLogger()
+        self.tidbyt = None
+        if enable_tidbyt:
+            try:
+                from tidbyt_integration import TidbytPusher
+                self.tidbyt = TidbytPusher()
+            except ImportError:
+                print("Warning: Tidbyt integration not available. Install requirements-tidbyt.txt")
         self.running = True
         self.configure_requested = False
         self.in_config_mode = False
@@ -797,8 +805,16 @@ class EasyHistoryMonitor:
             last_upload = max(self.brewstat.last_upload.values()).strftime("%H:%M:%S")
             brewstat_status += f" ({last_upload})"
         
+        tidbyt_status = ""
+        if self.tidbyt:
+            tidbyt_status = "ENABLED" if self.tidbyt.enabled else "DISABLED"
+            if self.tidbyt.enabled and self.tidbyt.last_push:
+                last_push = max(self.tidbyt.last_push.values()).strftime("%H:%M:%S")
+                tidbyt_status += f" ({last_push})"
+            tidbyt_status = f" | Tidbyt: {tidbyt_status}"
+        
         total_readings = sum(len(history) for history in self.logger.history.values())
-        lines.append(f"BrewStat.us: {brewstat_status} | CSV: {total_readings} readings | Press: 'q'=quit 'c'=config")
+        lines.append(f"BrewStat.us: {brewstat_status}{tidbyt_status} | CSV: {total_readings} readings | Press: 'q'=quit 'c'=config")
         
         # Print everything as one block with proper line endings for raw mode
         print('\r\n'.join(lines), flush=True)
@@ -813,6 +829,8 @@ class EasyHistoryMonitor:
                     self.logger.log_reading(device)
                     if self.brewstat.enabled:
                         await self.brewstat.upload_reading(device)
+                    if self.tidbyt and self.tidbyt.enabled:
+                        await self.tidbyt.push_to_tidbyt(device)
                         
                 await asyncio.sleep(3)
             except Exception as e:
@@ -858,8 +876,14 @@ class EasyHistoryMonitor:
                     print("1. Change API Key")
                     print("2. Change Upload Interval") 
                     print("3. Calibrate Devices")
-                    print("4. Disable BrewStat.us")
-                    print("5. Return to monitor")
+                    if self.tidbyt:
+                        tidbyt_status = "ENABLED" if self.tidbyt.enabled else "DISABLED"
+                        print(f"4. Tidbyt Integration ({tidbyt_status})")
+                        print("5. Disable BrewStat.us")
+                        print("6. Return to monitor")
+                    else:
+                        print("4. Disable BrewStat.us")
+                        print("5. Return to monitor")
                     print(COLORS['bold_white'] + "=" * 60 + COLORS['green'])
                     print("")  # Extra line before prompt
                     
@@ -872,7 +896,8 @@ class EasyHistoryMonitor:
                         original_handler = signal.signal(signal.SIGINT, config_signal_handler)
                         
                         try:
-                            choice = input("Select option (1-5) > ").strip()
+                            max_choice = "6" if self.tidbyt else "5"
+                            choice = input(f"Select option (1-{max_choice}) > ").strip()
                             
                             if choice == '1':
                                 print("\nEnter your BrewStat.us API key:")
@@ -905,15 +930,38 @@ class EasyHistoryMonitor:
                                 await self._handle_calibration_menu()
                                     
                             elif choice == '4':
-                                confirm = input("Disable BrewStat.us uploads? (y/N) > ").strip().lower()
-                                if confirm == 'y':
-                                    self.brewstat.enabled = False
-                                    self.brewstat._save_config(enabled=False)
-                                    print("✅ BrewStat.us uploads disabled")
+                                if self.tidbyt:
+                                    # Tidbyt configuration
+                                    from tidbyt_integration import configure_interactive
+                                    configure_interactive()
+                                    # Reload Tidbyt configuration after interactive setup
+                                    self.tidbyt._load_config()
+                                    print(f"✅ Tidbyt configuration reloaded. Status: {'ENABLED' if self.tidbyt.enabled else 'DISABLED'}")
                                 else:
-                                    print("BrewStat.us remains enabled")
-                                    
+                                    # Disable BrewStat.us
+                                    confirm = input("Disable BrewStat.us uploads? (y/N) > ").strip().lower()
+                                    if confirm == 'y':
+                                        self.brewstat.enabled = False
+                                        self.brewstat._save_config(enabled=False)
+                                        print("✅ BrewStat.us uploads disabled")
+                                    else:
+                                        print("BrewStat.us remains enabled")
+                                        
                             elif choice == '5':
+                                if self.tidbyt:
+                                    # Disable BrewStat.us when Tidbyt is available
+                                    confirm = input("Disable BrewStat.us uploads? (y/N) > ").strip().lower()
+                                    if confirm == 'y':
+                                        self.brewstat.enabled = False
+                                        self.brewstat._save_config(enabled=False)
+                                        print("✅ BrewStat.us uploads disabled")
+                                    else:
+                                        print("BrewStat.us remains enabled")
+                                else:
+                                    # Return to monitor
+                                    print("Returning to monitor...")
+                                    
+                            elif choice == '6' and self.tidbyt:
                                 print("Returning to monitor...")
                             else:
                                 print("Invalid choice")
@@ -974,11 +1022,19 @@ class EasyHistoryMonitor:
         
         print(COLORS['reset'] + "\nEasy History Monitor stopped.")
 
-if __name__ == "__main__":
-    monitor = EasyHistoryMonitor()
+def main():
+    parser = argparse.ArgumentParser(description='Tilt Hydrometer Monitor with ASCII Display')
+    parser.add_argument('--tidbyt', action='store_true', 
+                       help='Enable Tidbyt integration (requires requirements-tidbyt.txt)')
+    args = parser.parse_args()
+    
+    monitor = EasyHistoryMonitor(enable_tidbyt=args.tidbyt)
     try:
         asyncio.run(monitor.run())
     except KeyboardInterrupt:
         print("\nExiting...")
     except Exception as e:
         print(f"Error: {e}")
+
+if __name__ == "__main__":
+    main()
