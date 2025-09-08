@@ -128,41 +128,49 @@ class TidbytPusher:
             temp_f = device.get_calibrated_temperature_f()
             gravity = device.get_calibrated_gravity()
             
-            # Try to use default font, fall back to simple drawing if unavailable
+            # Try to use default font, and create a smaller font for units
             try:
                 font_small = ImageFont.load_default()
                 font_large = ImageFont.load_default()
+                # Try to create a smaller font (75% of default size for units)
+                try:
+                    font_tiny = ImageFont.load_default().font_variant(size=int(11 * 0.75))
+                except:
+                    font_tiny = font_small  # Fallback to small if variant doesn't work
             except:
                 font_small = None
-                font_large = None
+                font_large = None  
+                font_tiny = None
             
-            # Draw device name only at top center (no time)
+            # Draw device name higher up with more spacing (moved up 3 rows)
             device_text = f"{device.color} TILT"
-            text_width = draw.textlength(device_text, font=font_small)
+            text_width = draw.textlength(device_text, font=font_small) if font_small else len(device_text) * 6
             draw.text(((64 - text_width) // 2, 1), device_text, fill=device_color, font=font_small)
             
-            # Draw two boxes side by side
+            # Draw two boxes side by side (moved down to create space)
             # Left box for Gravity (32x20 pixels)
-            draw.rectangle((1, 10, 31, 29), outline=(100, 100, 100), width=1)
+            draw.rectangle((1, 13, 31, 29), outline=(100, 100, 100), width=1)
             
             # Right box for Temperature (32x20 pixels) 
-            draw.rectangle((33, 10, 62, 29), outline=(100, 100, 100), width=1)
+            draw.rectangle((33, 13, 62, 29), outline=(100, 100, 100), width=1)
             
-            # Gravity box content - value on line 2, units on line 3
+            # Gravity box content - value moved up 2 rows, units smaller on line 3
             gravity_str = f"{gravity:.3f}"
-            # Center gravity value in left box (line 2)
-            grav_width = draw.textlength(gravity_str, font=font_small)
+            # Center gravity value in left box (moved up 2 rows)
+            grav_width = draw.textlength(gravity_str, font=font_small) if font_small else len(gravity_str) * 6
             draw.text((16 - grav_width // 2, 15), gravity_str, fill=(255, 255, 255), font=font_small)
-            # Units on line 3
-            draw.text((3, 23), "SG", fill=(204, 204, 204), font=font_small)
+            # Units on line 3 with smaller font (25% smaller)
+            sg_width = draw.textlength("SG", font=font_tiny) if font_tiny else 12
+            draw.text((16 - sg_width // 2, 24), "SG", fill=(204, 204, 204), font=font_tiny)
             
-            # Temperature box content - value on line 2, units on line 3
+            # Temperature box content - value moved up 2 rows, units smaller on line 3
             temp_str = f"{temp_f:.1f}"
-            # Center temperature value in right box (line 2)
-            temp_width = draw.textlength(temp_str, font=font_small)
+            # Center temperature value in right box (moved up 2 rows)
+            temp_width = draw.textlength(temp_str, font=font_small) if font_small else len(temp_str) * 6
             draw.text((48 - temp_width // 2, 15), temp_str, fill=(255, 170, 68), font=font_small)
-            # Units on line 3
-            draw.text((35, 23), "°F", fill=(204, 204, 204), font=font_small)
+            # Units on line 3 with smaller font (25% smaller)
+            f_width = draw.textlength("°F", font=font_tiny) if font_tiny else 12
+            draw.text((48 - f_width // 2, 24), "°F", fill=(204, 204, 204), font=font_tiny)
             
             # Draw status bar at bottom
             draw.rectangle((0, 31, 63, 31), fill=device_color)
