@@ -27,4 +27,5 @@ data/
 
 # Temporary files
 *.tmp
-*~
+*~# Configuration files with API keys
+tilt_config.json
