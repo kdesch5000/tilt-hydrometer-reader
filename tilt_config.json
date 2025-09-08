@@ -1,5 +1,5 @@
 {
-  "brewstat_api_key": "XXXXXX",
+  "brewstat_api_key": "XXXXXXXX",
   "temperature_range": {
     "min": 60,
     "max": 80
