@@ -14,13 +14,14 @@ This project aims to create a standalone Bluetooth data reader for the Tilt hydr
 
 ### Key Features
 
-- [ ] Bluetooth LE scanning and connection to Tilt devices
-- [ ] Parse gravity (specific gravity) and temperature data
-- [ ] Local data storage (CSV/JSON format)
-- [ ] Terminal-based ASCII art display interface
-- [ ] BrewStat.us cloud logging integration
-- [ ] Support for multiple Tilt colors/devices
-- [ ] Data export capabilities
+- [x] Bluetooth LE scanning and connection to Tilt devices
+- [x] Parse gravity (specific gravity) and temperature data
+- [x] Local data storage (CSV/JSON format)
+- [x] Terminal-based ASCII art display interface
+- [x] BrewStat.us cloud logging integration
+- [x] Support for multiple Tilt colors/devices
+- [x] Device calibration system
+- [x] Real-time monitoring with instant keyboard controls
 
 ### Technical Requirements
 
@@ -140,7 +141,7 @@ sudo systemctl restart bluetooth
 #### API Endpoint
 - **URL Format**: `https://www.brewstat.us/tilt/{API_KEY}/log`
 - **Method**: POST (assumed based on standard cloud logging practices)
-- **Example**: `https://www.brewstat.us/tilt/YkgjKDB3pV/log`
+- **Example**: `https://www.brewstat.us/tilt/XXXXXX/log`
 
 #### Data Format Requirements
 Based on research of similar services, the expected payload likely includes:
@@ -220,10 +221,59 @@ Color Scheme:
 - Status indicators: GREEN (●CONNECTED) / RED (●DISCONNECTED)
 ```
 
+## Current Implementation
+
+### Core Applications
+
+1. **tilt_monitor.py** - Complete terminal ASCII interface monitor
+   - Real-time display with large ASCII numbers for gravity and temperature
+   - Side-by-side history charts for temperature and gravity trends  
+   - Instant keyboard controls (q=quit, c=configure, h=help)
+   - BrewStat.us cloud logging with configurable upload intervals
+   - Multi-device support for all 8 Tilt colors
+   - Automatic data logging to CSV files
+
+2. **tilt_scanner.py** - Core Bluetooth scanning engine
+   - iBeacon protocol implementation for Tilt detection
+   - Multi-device scanning and data parsing
+   - Calibration system with offset corrections
+   - Real-time RSSI signal strength monitoring
+
+3. **calibrate_tilt.py** - Device calibration utility
+   - Interactive calibration process
+   - Temperature and gravity offset corrections
+   - Persistent calibration storage
+
+### Usage
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run main monitor (requires root for Bluetooth)
+sudo python3 tilt_monitor.py
+
+# Calibrate devices
+sudo python3 calibrate_tilt.py
+```
+
+### Interface Features
+
+- **Large ASCII Art Numbers**: 7-row high display for easy reading
+- **Real-time Updates**: 3-second refresh cycle
+- **History Charts**: 24-hour temperature and gravity trends
+- **Signal Monitoring**: RSSI strength and last update timestamps  
+- **Cloud Integration**: Automatic BrewStat.us uploads every 15 minutes
+- **Configuration Screen**: Interactive setup for API keys and settings
+- **Instant Controls**: No Enter key required for q/c/h commands
+
 ## Project Status
 
-- [x] Project initialization
-- [ ] Bluetooth protocol research
-- [ ] Library evaluation
-- [ ] Prototype development
-- [ ] Testing and validation
+- [x] Project initialization and research
+- [x] Bluetooth protocol implementation (iBeacon/BLE)
+- [x] Library evaluation and aioblescan integration
+- [x] Complete terminal ASCII interface development
+- [x] Multi-device support and calibration system
+- [x] BrewStat.us cloud logging integration
+- [x] Data storage and history tracking
+- [x] Real-time monitoring with instant controls
