@@ -282,7 +282,18 @@ Color Scheme:
    - Temperature and gravity offset corrections
    - Persistent calibration storage
 
-### Usage
+### Installation
+
+**📋 For complete step-by-step installation on a fresh Raspberry Pi, see [INSTALL.md](INSTALL.md)**
+
+The installation guide includes:
+- Downloading the project from GitHub
+- Installing all system dependencies
+- Bluetooth configuration
+- Python environment setup
+- Testing and troubleshooting
+
+### Quick Start (if already set up)
 
 ```bash
 # Install dependencies
