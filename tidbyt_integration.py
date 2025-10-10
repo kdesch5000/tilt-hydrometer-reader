@@ -112,68 +112,137 @@ class TidbytPusher:
             img = Image.new('RGB', (64, 32), color=(0, 0, 0))
             draw = ImageDraw.Draw(img)
             
-            # Color mapping for Tilt devices
+            # Color mapping for Tilt devices - BRIGHTER colors
             color_map = {
-                'RED': (255, 68, 68),
-                'GREEN': (68, 255, 68),
-                'BLACK': (200, 200, 200),
-                'PURPLE': (204, 68, 204),
-                'ORANGE': (255, 136, 68),
-                'BLUE': (68, 68, 255),
-                'YELLOW': (255, 255, 68),
-                'PINK': (255, 136, 204)
+                'RED': (255, 100, 100),      # Brighter red
+                'GREEN': (100, 255, 100),
+                'BLACK': (220, 220, 220),
+                'PURPLE': (220, 100, 220),
+                'ORANGE': (255, 150, 100),
+                'BLUE': (100, 100, 255),
+                'YELLOW': (255, 255, 100),
+                'PINK': (255, 150, 220)
             }
             
             device_color = color_map.get(device.color, (255, 255, 255))
             temp_f = device.get_calibrated_temperature_f()
             gravity = device.get_calibrated_gravity()
             
-            # Try to use default font, and create a smaller font for units
+            # Try to use a proper sans-serif TrueType font for ALL text
             try:
-                font_small = ImageFont.load_default()
-                font_large = ImageFont.load_default()
-                # Try to create a smaller font (75% of default size for units)
-                try:
-                    font_tiny = ImageFont.load_default().font_variant(size=int(11 * 0.75))
-                except:
-                    font_tiny = font_small  # Fallback to small if variant doesn't work
+                # Try common sans-serif fonts available on Linux systems
+                font_paths = [
+                    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+                    '/usr/share/fonts/TTF/DejaVuSans.ttf',
+                    '/System/Library/Fonts/Helvetica.ttc',  # macOS
+                ]
+
+                font_header = None
+                font_numbers = None
+
+                for font_path in font_paths:
+                    try:
+                        font_header = ImageFont.truetype(font_path, size=8)   # Header text
+                        font_numbers = ImageFont.truetype(font_path, size=10) # Numbers (slightly larger)
+                        break
+                    except:
+                        continue
+
+                # If no TrueType font found, fall back to default
+                if not font_header:
+                    font_header = ImageFont.load_default()
+                if not font_numbers:
+                    font_numbers = ImageFont.load_default()
+
             except:
-                font_small = None
-                font_large = None  
-                font_tiny = None
+                font_header = None
+                font_numbers = None
             
-            # Draw device name higher up with more spacing (moved up 3 rows)
+            # Draw device name - Use device color, NO ANTIALIASING
             device_text = f"{device.color} TILT"
-            text_width = draw.textlength(device_text, font=font_small) if font_small else len(device_text) * 6
-            draw.text(((64 - text_width) // 2, 1), device_text, fill=device_color, font=font_small)
+
+            # Render text on 1-bit image to eliminate antialiasing
+            if font_header:
+                bbox = font_header.getbbox(device_text)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+
+                # Create 1-bit image (black and white only, no gray)
+                text_img = Image.new('1', (text_width + 2, text_height + 2), 0)
+                text_draw = ImageDraw.Draw(text_img)
+                text_draw.text((-bbox[0], -bbox[1]), device_text, fill=1, font=font_header)
+
+                # Copy pixels to main image with solid color (moved down 2 lines)
+                x_pos = (64 - text_width) // 2
+                for y in range(text_img.height):
+                    for x in range(text_img.width):
+                        if text_img.getpixel((x, y)):
+                            draw.point((x_pos + x, 4 + y), fill=device_color)
+            else:
+                # Fallback to default font (moved down 2 lines)
+                text_width = draw.textlength(device_text, font=font_header) if font_header else len(device_text) * 6
+                draw.text(((64 - text_width) // 2, 4), device_text, fill=device_color, font=font_header)
             
             # Draw two boxes side by side (moved down to create space)
-            # Left box for Gravity (32x20 pixels)
-            draw.rectangle((1, 13, 31, 29), outline=(100, 100, 100), width=1)
+            # Left box for Gravity (32x20 pixels) - BRIGHT 1px border
+            draw.rectangle((1, 13, 31, 29), outline=(240, 240, 240), width=1)
+
+            # Right box for Temperature (32x20 pixels) - BRIGHT 1px border
+            draw.rectangle((33, 13, 62, 29), outline=(240, 240, 240), width=1)
             
-            # Right box for Temperature (32x20 pixels) 
-            draw.rectangle((33, 13, 62, 29), outline=(100, 100, 100), width=1)
-            
-            # Gravity box content - value moved up 2 rows, units smaller on line 3
+            # Gravity box content - centered value (no units), NO ANTIALIASING
             gravity_str = f"{gravity:.3f}"
-            # Center gravity value in left box (moved up 2 rows)
-            grav_width = draw.textlength(gravity_str, font=font_small) if font_small else len(gravity_str) * 6
-            draw.text((16 - grav_width // 2, 15), gravity_str, fill=(255, 255, 255), font=font_small)
-            # Units on line 3 with smaller font (25% smaller)
-            sg_width = draw.textlength("SG", font=font_tiny) if font_tiny else 12
-            draw.text((16 - sg_width // 2, 24), "SG", fill=(204, 204, 204), font=font_tiny)
+
+            if font_numbers:
+                # Render gravity text without antialiasing using TrueType font
+                bbox = font_numbers.getbbox(gravity_str)
+                grav_width = bbox[2] - bbox[0]
+                grav_height = bbox[3] - bbox[1]
+
+                # 1-bit rendering for gravity
+                grav_img = Image.new('1', (grav_width + 4, grav_height + 4), 0)
+                grav_draw = ImageDraw.Draw(grav_img)
+                grav_draw.text((-bbox[0] + 2, -bbox[1] + 2), gravity_str, fill=1, font=font_numbers)
+
+                # Copy to main image with solid white (centered vertically in box)
+                x_pos = 16 - grav_width // 2
+                y_pos = 21 - grav_height // 2  # Center in box (13+29)/2 = 21
+                for y in range(grav_img.height):
+                    for x in range(grav_img.width):
+                        if grav_img.getpixel((x, y)):
+                            draw.point((x_pos + x - 2, y_pos + y - 2), fill=(255, 255, 255))
+            else:
+                # Fallback (centered vertically in box)
+                grav_width = len(gravity_str) * 6
+                draw.text((16 - grav_width // 2, 18), gravity_str, fill=(255, 255, 255))
             
-            # Temperature box content - value moved up 2 rows, units smaller on line 3
+            # Temperature box content - centered value (no units), NO ANTIALIASING
             temp_str = f"{temp_f:.1f}"
-            # Center temperature value in right box (moved up 2 rows)
-            temp_width = draw.textlength(temp_str, font=font_small) if font_small else len(temp_str) * 6
-            draw.text((48 - temp_width // 2, 15), temp_str, fill=(255, 170, 68), font=font_small)
-            # Units on line 3 with smaller font (25% smaller)
-            f_width = draw.textlength("°F", font=font_tiny) if font_tiny else 12
-            draw.text((48 - f_width // 2, 24), "°F", fill=(204, 204, 204), font=font_tiny)
+
+            if font_numbers:
+                # Render temperature text without antialiasing using TrueType font
+                bbox = font_numbers.getbbox(temp_str)
+                temp_width = bbox[2] - bbox[0]
+                temp_height = bbox[3] - bbox[1]
+
+                # 1-bit rendering for temperature
+                temp_img = Image.new('1', (temp_width + 4, temp_height + 4), 0)
+                temp_draw = ImageDraw.Draw(temp_img)
+                temp_draw.text((-bbox[0] + 2, -bbox[1] + 2), temp_str, fill=1, font=font_numbers)
+
+                # Copy to main image with orange color (centered vertically in box)
+                x_pos = 48 - temp_width // 2
+                y_pos = 21 - temp_height // 2  # Center in box (13+29)/2 = 21
+                for y in range(temp_img.height):
+                    for x in range(temp_img.width):
+                        if temp_img.getpixel((x, y)):
+                            draw.point((x_pos + x - 2, y_pos + y - 2), fill=(255, 170, 68))
+            else:
+                # Fallback (centered vertically in box)
+                temp_width = len(temp_str) * 6
+                draw.text((48 - temp_width // 2, 18), temp_str, fill=(255, 170, 68))
             
-            # Draw status bar at bottom
-            draw.rectangle((0, 31, 63, 31), fill=device_color)
             
             # Convert to WebP
             img_buffer = io.BytesIO()

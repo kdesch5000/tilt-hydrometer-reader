@@ -64,7 +64,7 @@ def cleanup_and_push_fresh():
         success = asyncio.run(pusher.push_to_tidbyt(mock_device))
         if success:
             print("✅ Fresh Tilt display pushed successfully!")
-            print(f"✅ Installation ID: tilt-hydrometer-{mock_device.color.lower()}-v2024")
+            print(f"✅ Installation ID: tilthydrometer{mock_device.color.lower()}v2024")
             print("\nYour Tidbyt should now show only one, current Tilt display.")
         else:
             print("❌ Failed to push fresh display")
