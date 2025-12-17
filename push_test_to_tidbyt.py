@@ -20,7 +20,7 @@ class MockTiltDevice:
     rssi: int = -45
     last_seen: datetime = None
     temp_offset: float = 0.0
-    gravity_offset: float = 0.0
+    gravity_offset: float = 0.002
     uuid: str = "mock-device-test"
 
     def __post_init__(self):
@@ -37,7 +37,7 @@ class MockTiltDevice:
         return self.specific_gravity + self.gravity_offset
 
 
-async def push_test_display(gravity=1.045, temp_f=68.5, color="RED"):
+async def push_test_display(gravity=1.045, temp_f=68.5, color="RED", gravity_offset=0.002):
     """Push test display to actual Tidbyt device"""
 
     print("=" * 60)
@@ -56,16 +56,19 @@ async def push_test_display(gravity=1.045, temp_f=68.5, color="RED"):
     print(f"📡 Pushing to Tidbyt device: {pusher.config.device_id}")
     print()
     print(f"Display settings:")
-    print(f"  Color:       {color}")
-    print(f"  Gravity:     {gravity:.3f} SG")
-    print(f"  Temperature: {temp_f:.1f}°F ({(temp_f - 32) * 5/9:.1f}°C)")
+    print(f"  Color:             {color}")
+    print(f"  Uncalibrated SG:   {gravity:.3f}")
+    print(f"  Calibration Offset: {gravity_offset:+.3f}")
+    print(f"  Calibrated SG:     {gravity + gravity_offset:.3f}")
+    print(f"  Temperature:       {temp_f:.1f}°F ({(temp_f - 32) * 5/9:.1f}°C)")
     print()
 
     # Create mock device with custom values
     mock_device = MockTiltDevice(
         color=color.upper(),
         temperature_f=temp_f,
-        specific_gravity=gravity
+        specific_gravity=gravity,
+        gravity_offset=gravity_offset
     )
 
     # Override the should_push check for testing
@@ -80,9 +83,10 @@ async def push_test_display(gravity=1.045, temp_f=68.5, color="RED"):
             print("✅ Successfully pushed to Tidbyt!")
             print()
             print("Check your Tidbyt device now to see:")
-            print("  ✓ Brighter white boxes (240,240,240 instead of 100,100,100)")
-            print("  ✓ Thicker borders (2px instead of 1px)")
-            print("  ✓ Thicker status bar at bottom")
+            print("  ✓ Large calibrated SG (top, bright white)")
+            print("  ✓ Normal-sized uncalibrated SG (bottom, gray)")
+            print("  ✓ Temperature on the right side")
+            print("  ✓ Device color header at top")
             print()
             print(f"Installation ID: tilthydrometer{color.lower()}v2024")
             return True
@@ -106,6 +110,7 @@ def main():
     gravity = 1.045
     temp_f = 68.5
     color = "RED"
+    gravity_offset = 0.002
 
     # Parse command line arguments
     if len(sys.argv) > 1:
@@ -125,13 +130,21 @@ def main():
     if len(sys.argv) > 3:
         color = sys.argv[3].upper()
 
+    if len(sys.argv) > 4:
+        try:
+            gravity_offset = float(sys.argv[4])
+        except ValueError:
+            print(f"❌ Invalid gravity offset value: {sys.argv[4]}")
+            sys.exit(1)
+
     # Run async push
-    success = asyncio.run(push_test_display(gravity, temp_f, color))
+    success = asyncio.run(push_test_display(gravity, temp_f, color, gravity_offset))
 
     if success:
         print("Try different values:")
         print("  python3 push_test_to_tidbyt.py 1.020 72.0 GREEN")
-        print("  python3 push_test_to_tidbyt.py 1.060 65.5 PURPLE")
+        print("  python3 push_test_to_tidbyt.py 1.060 65.5 PURPLE 0.005")
+        print("  python3 push_test_to_tidbyt.py 1.045 68.5 RED -0.003")
         sys.exit(0)
     else:
         print()

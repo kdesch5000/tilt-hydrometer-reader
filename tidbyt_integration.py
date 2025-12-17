@@ -127,7 +127,8 @@ class TidbytPusher:
             device_color = color_map.get(device.color, (255, 255, 255))
             temp_f = device.get_calibrated_temperature_f()
             gravity = device.get_calibrated_gravity()
-            
+            uncalibrated_gravity = device.specific_gravity
+
             # Try to use a proper sans-serif TrueType font for ALL text
             try:
                 # Try common sans-serif fonts available on Linux systems
@@ -140,11 +141,13 @@ class TidbytPusher:
 
                 font_header = None
                 font_numbers = None
+                font_normal = None
 
                 for font_path in font_paths:
                     try:
                         font_header = ImageFont.truetype(font_path, size=8)   # Header text
-                        font_numbers = ImageFont.truetype(font_path, size=10) # Numbers (slightly larger)
+                        font_numbers = ImageFont.truetype(font_path, size=10) # Large numbers for calibrated
+                        font_normal = ImageFont.truetype(font_path, size=8)   # Normal text for uncalibrated
                         break
                     except:
                         continue
@@ -154,10 +157,13 @@ class TidbytPusher:
                     font_header = ImageFont.load_default()
                 if not font_numbers:
                     font_numbers = ImageFont.load_default()
+                if not font_normal:
+                    font_normal = ImageFont.load_default()
 
             except:
                 font_header = None
                 font_numbers = None
+                font_normal = None
             
             # Draw device name - Use device color, NO ANTIALIASING
             device_text = f"{device.color} TILT"
@@ -190,33 +196,60 @@ class TidbytPusher:
 
             # Right box for Temperature (32x20 pixels) - BRIGHT 1px border
             draw.rectangle((33, 13, 62, 29), outline=(240, 240, 240), width=1)
-            
-            # Gravity box content - centered value (no units), NO ANTIALIASING
+
+            # Gravity box content - calibrated value on top, NO ANTIALIASING
+            # Box is from y=13 to y=29 (16 pixels tall)
             gravity_str = f"{gravity:.3f}"
 
             if font_numbers:
-                # Render gravity text without antialiasing using TrueType font
+                # Render calibrated gravity text without antialiasing using TrueType font
                 bbox = font_numbers.getbbox(gravity_str)
                 grav_width = bbox[2] - bbox[0]
                 grav_height = bbox[3] - bbox[1]
 
-                # 1-bit rendering for gravity
+                # 1-bit rendering for calibrated gravity
                 grav_img = Image.new('1', (grav_width + 4, grav_height + 4), 0)
                 grav_draw = ImageDraw.Draw(grav_img)
                 grav_draw.text((-bbox[0] + 2, -bbox[1] + 2), gravity_str, fill=1, font=font_numbers)
 
-                # Copy to main image with solid white (centered vertically in box)
+                # Copy to main image with solid white (positioned at top of box)
                 x_pos = 16 - grav_width // 2
-                y_pos = 21 - grav_height // 2  # Center in box (13+29)/2 = 21
+                y_pos = 15  # At top of box to make room below
                 for y in range(grav_img.height):
                     for x in range(grav_img.width):
                         if grav_img.getpixel((x, y)):
                             draw.point((x_pos + x - 2, y_pos + y - 2), fill=(255, 255, 255))
             else:
-                # Fallback (centered vertically in box)
+                # Fallback (positioned at top)
                 grav_width = len(gravity_str) * 6
-                draw.text((16 - grav_width // 2, 18), gravity_str, fill=(255, 255, 255))
-            
+                draw.text((16 - grav_width // 2, 14), gravity_str, fill=(255, 255, 255))
+
+            # Add uncalibrated gravity below in normal-sized text
+            uncalib_str = f"{uncalibrated_gravity:.3f}"
+
+            if font_normal:
+                # Render uncalibrated gravity text without antialiasing using normal font
+                bbox_normal = font_normal.getbbox(uncalib_str)
+                uncalib_width = bbox_normal[2] - bbox_normal[0]
+                uncalib_height = bbox_normal[3] - bbox_normal[1]
+
+                # 1-bit rendering for uncalibrated gravity
+                uncalib_img = Image.new('1', (uncalib_width + 4, uncalib_height + 4), 0)
+                uncalib_draw = ImageDraw.Draw(uncalib_img)
+                uncalib_draw.text((-bbox_normal[0] + 2, -bbox_normal[1] + 2), uncalib_str, fill=1, font=font_normal)
+
+                # Copy to main image with dimmer gray color (positioned at bottom of box)
+                x_pos_uncalib = 16 - uncalib_width // 2
+                y_pos_uncalib = 23  # At bottom of box, below the calibrated value
+                for y in range(uncalib_img.height):
+                    for x in range(uncalib_img.width):
+                        if uncalib_img.getpixel((x, y)):
+                            draw.point((x_pos_uncalib + x - 2, y_pos_uncalib + y - 2), fill=(160, 160, 160))
+            else:
+                # Fallback - use default font with simpler rendering
+                uncalib_width = len(uncalib_str) * 6
+                draw.text((16 - uncalib_width // 2, 22), uncalib_str, fill=(160, 160, 160))
+
             # Temperature box content - centered value (no units), NO ANTIALIASING
             temp_str = f"{temp_f:.1f}"
 

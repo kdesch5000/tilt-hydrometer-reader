@@ -29,6 +29,7 @@ COLORS = {
     'green': '\033[32m',
     'bold_white': '\033[1;97m',
     'yellow': '\033[33m',
+    'bright_red': '\033[91m',
     'clear_screen': '\033[2J\033[H',
 }
 
@@ -243,35 +244,92 @@ class EasyBrewStatLogger:
             pass
             
     def should_upload(self, color: str) -> bool:
-        if not self.enabled or not self.api_key:
+        if not self.enabled:
             return False
-            
+
+        if not self.api_key:
+            return False
+
         last = self.last_upload.get(color)
         if not last:
+            # First upload for this device
             return True
-            
-        return (datetime.now() - last).total_seconds() > self.upload_interval_seconds
-        
+
+        seconds_since_last = (datetime.now() - last).total_seconds()
+        if seconds_since_last > self.upload_interval_seconds:
+            return True
+
+        return False
+
     async def upload_reading(self, device: TiltDevice):
         if not self.should_upload(device.color):
             return False
-            
+
+        # Validate device has recent valid readings before uploading
+        if not device.last_seen:
+            print(f"\n[BrewStat] ⚠️  Skipping {device.color} upload - no readings yet\n", flush=True)
+            return False
+
+        # Check if device was seen recently (within last 60 seconds)
+        seconds_since_seen = (datetime.now() - device.last_seen).total_seconds()
+        if seconds_since_seen > 60:
+            print(f"\n[BrewStat] ⚠️  Skipping {device.color} upload - stale data ({seconds_since_seen:.0f}s old)\n", flush=True)
+            return False
+
+        # Get calibrated values
+        temperature = device.get_calibrated_temperature_f()
+        gravity = device.get_calibrated_gravity()
+
+        # Validate readings are non-zero and reasonable
+        if temperature == 0.0 or gravity == 0.0:
+            print(f"\n[BrewStat] ⚠️  Skipping {device.color} upload - zero values (temp={temperature}, gravity={gravity})\n", flush=True)
+            return False
+
+        # Additional sanity check for reasonable ranges
+        if temperature < 32.0 or temperature > 212.0:
+            print(f"\n[BrewStat] ⚠️  Skipping {device.color} upload - temperature out of range ({temperature}°F)\n", flush=True)
+            return False
+
+        if gravity < 0.900 or gravity > 1.200:
+            print(f"\n[BrewStat] ⚠️  Skipping {device.color} upload - gravity out of range ({gravity} SG)\n", flush=True)
+            return False
+
         try:
             url = f"https://www.brewstat.us/tilt/{self.api_key}/log"
+
+            # Convert timestamp to Excel serial date format (days since 1900-01-01)
+            # Excel epoch is 1900-01-01, but has a bug where 1900 is treated as leap year
+            from datetime import datetime as dt
+            excel_epoch = dt(1899, 12, 30)  # Adjusted for Excel's leap year bug
+            delta = datetime.now() - excel_epoch
+            timepoint = delta.days + delta.seconds / 86400.0
+
+            # BrewStat.us expects specific field names and form-encoded data
+            # Color must match the capitalization in BrewStat.us device settings (e.g., "Red" not "RED")
             data = {
-                "timestamp": datetime.now().isoformat(),
-                "temperature": device.get_calibrated_temperature_f(),
-                "gravity": device.get_calibrated_gravity(),
-                "color": device.color,
-                "device_id": device.uuid
+                "Timepoint": str(timepoint),
+                "Color": device.color.capitalize(),  # "RED" -> "Red", "GREEN" -> "Green", etc.
+                "Temp": str(temperature),
+                "SG": str(gravity),
+                "Comment": ""
             }
-            
-            response = requests.post(url, json=data, timeout=10)
+
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
+            }
+
+            response = requests.post(url, headers=headers, data=data, timeout=10)
             if response.status_code == 200:
                 self.last_upload[device.color] = datetime.now()
+                print(f"\n[BrewStat] ✅ Successfully uploaded {device.color} data: {temperature:.1f}°F, {gravity:.3f} SG\n", flush=True)
                 return True
-            return False
-        except Exception:
+            else:
+                # Log HTTP errors to help with debugging
+                print(f"\n[BrewStat] Upload failed with status {response.status_code}: {response.text}\n", flush=True)
+                return False
+        except Exception as e:
+            # Log exceptions to help with debugging
+            print(f"\n[BrewStat] Upload error: {type(e).__name__}: {e}\n", flush=True)
             return False
 
 class EasyHistoryMonitor:
@@ -678,8 +736,14 @@ class EasyHistoryMonitor:
                     status = "[ONLINE]"
                 else:
                     status = "[OFFLINE]"
-                    
-                lines.append(f"{status} {device.color} TILT - {time_str}")
+
+                # Apply bright red color for RED tilt devices
+                if device.color == "RED":
+                    color_name = COLORS['bright_red'] + device.color + COLORS['green']
+                else:
+                    color_name = device.color
+
+                lines.append(f"{status} {color_name} TILT - {time_str}")
                 lines.append("-" * 70)
                 lines.append("")
                 
@@ -687,7 +751,8 @@ class EasyHistoryMonitor:
                 temp_f = device.get_calibrated_temperature_f()
                 temp_c = device.get_calibrated_temperature_c()
                 gravity = device.get_calibrated_gravity()
-                
+                uncalibrated_gravity = device.specific_gravity
+
                 # Generate actual ASCII numbers from sensor readings
                 gravity_lines = self.create_large_number(gravity, 3)
                 temp_lines = self.create_large_number(temp_f, 1)
@@ -754,9 +819,17 @@ class EasyHistoryMonitor:
                 
                 sg_centered = " " * sg_padding_left + sg_text + " " * sg_padding_right
                 temp_text_centered = " " * temp_text_padding_left + temp_text + " " * temp_text_padding_right
-                
+
                 lines.append("│" + sg_centered + "│  │" + temp_text_centered + "│")
-                
+
+                # Add uncalibrated gravity value below calibrated (in gravity box only)
+                uncalib_text = f"Raw: {uncalibrated_gravity:.3f}"
+                uncalib_padding_left = (GRAVITY_BOX_WIDTH - len(uncalib_text)) // 2
+                uncalib_padding_right = GRAVITY_BOX_WIDTH - uncalib_padding_left - len(uncalib_text)
+                uncalib_centered = " " * uncalib_padding_left + uncalib_text + " " * uncalib_padding_right
+
+                lines.append("│" + uncalib_centered + "│  │" + " " * TEMP_BOX_WIDTH + "│")
+
                 # Bottom border
                 lines.append("└" + "─" * GRAVITY_BOX_WIDTH + "┘  └" + "─" * TEMP_BOX_WIDTH + "┘")
                 lines.append("")
@@ -918,7 +991,7 @@ class EasyHistoryMonitor:
                                     minutes = int(input("New interval in minutes (1-60) > ").strip())
                                     if 1 <= minutes <= 60:
                                         self.brewstat.upload_interval_seconds = minutes * 60
-                                        self.brewstat._save_config(upload_interval_seconds=self.brewstat.upload_interval_seconds)
+                                        self.brewstat._save_config(interval_seconds=self.brewstat.upload_interval_seconds)
                                         print(f"✅ Upload interval set to {minutes} minutes")
                                     else:
                                         print("Invalid interval. Must be 1-60 minutes.")
@@ -942,7 +1015,7 @@ class EasyHistoryMonitor:
                                     confirm = input("Disable BrewStat.us uploads? (y/N) > ").strip().lower()
                                     if confirm == 'y':
                                         self.brewstat.enabled = False
-                                        self.brewstat._save_config(enabled=False)
+                                        self.brewstat._save_config(api_key="")
                                         print("✅ BrewStat.us uploads disabled")
                                     else:
                                         print("BrewStat.us remains enabled")
@@ -953,7 +1026,7 @@ class EasyHistoryMonitor:
                                     confirm = input("Disable BrewStat.us uploads? (y/N) > ").strip().lower()
                                     if confirm == 'y':
                                         self.brewstat.enabled = False
-                                        self.brewstat._save_config(enabled=False)
+                                        self.brewstat._save_config(api_key="")
                                         print("✅ BrewStat.us uploads disabled")
                                     else:
                                         print("BrewStat.us remains enabled")
@@ -992,9 +1065,16 @@ class EasyHistoryMonitor:
         
         print(COLORS['black_bg'] + COLORS['green'] + "Starting Easy History Monitor...")
         print("Loading calibration...")
-        
+
         self.scanner.load_calibration()
-        
+
+        # Show BrewStat.us configuration status
+        print(f"BrewStat.us: {'ENABLED' if self.brewstat.enabled else 'DISABLED'}")
+        if self.brewstat.enabled:
+            masked_key = f"{self.brewstat.api_key[:8]}...{self.brewstat.api_key[-4:]}" if len(self.brewstat.api_key) > 12 else self.brewstat.api_key
+            print(f"  API Key: {masked_key}")
+            print(f"  Upload Interval: {self.brewstat.upload_interval_seconds}s ({self.brewstat.upload_interval_seconds//60}min)")
+
         print("Performing initial scan...")
         await self.scanner.scan(10)
         

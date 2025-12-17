@@ -75,6 +75,7 @@ class TiltScanner:
         self.device_id = device_id
         self.tilt_decoder = Tilt()
         self.quiet = quiet
+        self.calibration_data: Dict[str, Dict[str, float]] = {}  # Store calibration for future devices
         
     def process_data(self, data):
         """Process BLE advertisement data using aioblescan format"""
@@ -138,6 +139,15 @@ class TiltScanner:
             # Get or create device
             if device_key not in self.devices:
                 self.devices[device_key] = TiltDevice(color, device_key)
+
+                # Apply stored calibration if available
+                if color in self.calibration_data:
+                    cal = self.calibration_data[color]
+                    self.devices[device_key].temp_offset = cal.get('temp_offset', 0.0)
+                    self.devices[device_key].gravity_offset = cal.get('gravity_offset', 0.0)
+                    if not self.quiet:
+                        print(f"[{color}] Applied calibration - Temp: {self.devices[device_key].temp_offset:+.1f}°F, Gravity: {self.devices[device_key].gravity_offset:+.4f}")
+
                 if not self.quiet:
                     print(f"[DISCOVERED] {color} Tilt detected (UUID: {clean_uuid}, MAC: {mac_addr})")
             
@@ -295,18 +305,24 @@ class TiltScanner:
         print(f"Calibration saved to {filename}")
         
     def load_calibration(self, filename: str = "tilt_calibration.json"):
-        """Load calibration data from file"""
+        """Load calibration data from file and apply to existing and future devices"""
         try:
             with open(filename, 'r') as f:
-                calibration_data = json.load(f)
-                
+                self.calibration_data = json.load(f)
+
+            # Apply calibration to any already-discovered devices
             for device in self.devices.values():
-                if device.color in calibration_data:
-                    cal = calibration_data[device.color]
+                if device.color in self.calibration_data:
+                    cal = self.calibration_data[device.color]
                     device.temp_offset = cal.get('temp_offset', 0.0)
                     device.gravity_offset = cal.get('gravity_offset', 0.0)
                     print(f"[{device.color}] Loaded calibration - Temp: {device.temp_offset:+.1f}°F, Gravity: {device.gravity_offset:+.4f}")
-                    
+
+            # If no devices yet, just store for later
+            if not self.devices:
+                colors_loaded = ', '.join(self.calibration_data.keys())
+                print(f"Calibration data loaded for: {colors_loaded} (will be applied when devices are discovered)")
+
         except FileNotFoundError:
             print(f"Calibration file {filename} not found. Using default values.")
         except Exception as e:

@@ -1,0 +1,20 @@
+{
+  "brewstat_api_key": "YOUR_BREWSTAT_API_KEY_HERE",
+  "temperature_range": {
+    "min": 60,
+    "max": 80
+  },
+  "gravity_range": {
+    "min": 0.99,
+    "max": 1.1
+  },
+  "upload_interval_minutes": 15,
+  "scan_interval_seconds": 5,
+  "tidbyt": {
+    "device_id": "your-device-id-here",
+    "api_key": "YOUR_TIDBYT_API_TOKEN_HERE",
+    "installation_id": "Tilt",
+    "enabled": false,
+    "push_interval_seconds": 300
+  }
+}
